@@ -261,6 +261,7 @@ class Extract:
             self.LiDAR_model = self.LiDAR_model_list[2]
         elif max_scanline > 127:
             self.LiDAR_model = self.LiDAR_model_list[1]
+        print("Lidar is:", self.LiDAR_model)
         return res, sorted_fields
             
     def get_fold_files(self, path):
@@ -597,7 +598,7 @@ class Analysis:
          'Intensity Variance', pts_sel_var, 'Intensity Standard Deviation', pts_sel_std_1]
         return results
 
-    def Filter_xyz(self, input_array, framelimit, bounding_box, intensity_bounding):
+    def Filter_xyz(self, input_array, framelimit, bounding_box, intensity_bounding, facet):
         """
         Select points within the ‘bounding_box’
         """
@@ -622,6 +623,8 @@ class Analysis:
         if bool(intensity_bounding):
             input_array = input_array[np.where((input_array[:, 6] >= intensity_bounding[0]) & (input_array[:, 6] <= intensity_bounding[1]))]
         # print('**************3', input_array.shape[0])
+        if facet != None:
+            input_array = input_array[np.where(input_array[:, 0] == facet)]
         return input_array
 
     def Run_Cluster(self, pts):
@@ -653,9 +656,13 @@ class Analysis:
         Max_Width_Height = self.Get_Max_Width_Height(pts)
         Width = Max_Width_Height[0]
         Height = Max_Width_Height[1]
+        min_scanline = pts[np.where(pts[:,1] == min(pts[:,1]))][:, 1][0]
+        max_scanline = pts[np.where(pts[:,1] == max(pts[:,1]))][:, 1][0]
         print("Horizontal_R:", self.Horizontal_R[self.index], "Horizontal_V:", self.Vertical_R[self.index])
+        print("min_scanline:", min_scanline, "max_scanline:", max_scanline)
         row = math.floor(math.atan(Width / (2 * distance)) * 2 * 180 / math.pi / self.Horizontal_R[self.index])
-        col = math.floor(math.atan(Height / (2 * distance)) * 2 * 180 / math.pi / self.Vertical_R[self.index])
+        # col = math.floor(math.atan(Height / (2 * distance)) * 2 * 180 / math.pi / self.Vertical_R[self.index])
+        col = max_scanline - min_scanline + 1
         print("row:", row, "col:", col)
         ideal_points = row * col
         pod = '{:.2%}'.format(real_points / ideal_points)
@@ -663,7 +670,7 @@ class Analysis:
             pod = '{:.2%}'.format(1 + (real_points - ideal_points) / (ideal_points * 20))
         print('idea_points:', ideal_points)
         print('real_points:', real_points)
-        print('POD:', pod)
+        print('*********POD:', pod, "\n")
         results = [['distance', '{:.2f}'.format(distance), 'ideal_points', '{:.2f}'.format(ideal_points), 'real_points', '{:.2f}'.format(real_points), 'POD', '{:.2%}'.format(real_points / ideal_points)]]
         return results
 
@@ -695,33 +702,36 @@ class Analysis:
         # if 'flags' in fields:
         #     pts = pts[np.where((pts[:, 7] > 10) & (pts[:, 7] < 12))]
         #     temp = np.zeros(len(fields) + 2)
-        # result = self.q.get()
+        result = []
         if 'flags' in fields:
             # pts = pts[np.where((pts[:, 7] > 10) & (pts[:, 7] < 12))]
             temp = np.zeros(len(fields) + 2)
-            if self.extract.LiDAR_model == 'K': # I/G/K/K24
-                for i in range(len(pts[:, 0])):
-                    channel = np.append((pts[i]), [int('{:08b}'.format(int(pts[(i, 0)]))[-2:], 2)], axis=0)
-                    roi = np.append(channel, [int('{:08b}'.format(int(pts[(i, 0)]))[-3:-2], 2)], axis=0)
-                    temp = np.vstack([temp, roi])
-                jobs = []
-                for i in range(2):
-                    p = Process(target=(self.Calculate_Angle_Resolution), args=(temp, i, self.q))
-                    jobs.append(p)
-                    p.start()
+        if self.extract.LiDAR_model == 'K': # I/G/K/K24
+            print("start analysis K FOV&Res")
+            for i in range(len(pts[:, 0])):
+                channel = np.append((pts[i]), [int('{:08b}'.format(int(pts[(i, 0)]))[-2:], 2)], axis=0)
+                roi = np.append(channel, [int('{:08b}'.format(int(pts[(i, 0)]))[-3:-2], 2)], axis=0)
+                temp = np.vstack([temp, roi])
+            jobs = []
+            for i in range(2):
+                p = Process(target=(self.Calculate_Angle_Resolution), args=(temp, i, self.q))
+                jobs.append(p)
+                p.start()
 
-                for p in jobs:
-                    p.join()
+            for p in jobs:
+                p.join()
 
-                result = [self.q.get() for j in jobs]
-            
-            elif self.extract.LiDAR_model == 'E':
-                self.Calculate_Angle_Resolution(pts, -1, self.q)
-                result = self.q.get()
+            result = [self.q.get() for j in jobs]
+        
+        elif self.extract.LiDAR_model == 'E':
+            print("start analysis E FOV&Res")
+            self.Calculate_Angle_Resolution(pts, -1, self.q)
+            result = self.q.get()
 
-            elif self.extract.LiDAR_model == 'W':
-                self.Calculate_Angle_Resolution(pts, -2, self.q)
-                result = self.q.get()
+        elif self.extract.LiDAR_model == 'W':
+            print("start analysis W FOV&Res")
+            self.Calculate_Angle_Resolution(pts, -2, self.q)
+            result = self.q.get()
         print(result)
         return result
 
@@ -779,6 +789,18 @@ class Analysis:
         print('Hangle:', Hangle, 'H_Resolution:', H_Resolution, 'Vangle:', Vangle, 'V_Resolution:', V_Resolution, 'ROI:', I)
         q.put(['Hangle:', Hangle, 'H_Resolution:', H_Resolution, 'Vangle:', Vangle, 'V_Resolution:', V_Resolution, 'ROI:', I])
         # return Hangle, H_Resolution, Vangle, V_Resolution
+
+    def Calculate_Diff_Facet_POD(self, pts_sel, frame_counts):
+        points_f0 = self.Filter_xyz(pts_sel, [], [], [], 0)
+        points_f1 = self.Filter_xyz(pts_sel, [], [], [], 1) 
+        points_f2 = self.Filter_xyz(pts_sel, [], [], [], 2) 
+        points_f3 = self.Filter_xyz(pts_sel, [], [], [], 3)
+        POD_f0 = self.POD(points_f0, frame_counts, len(points_f0[:, 4]) / frame_counts)
+        POD_f1 = self.POD(points_f1, frame_counts, len(points_f1[:, 4]) / frame_counts)
+        POD_f2 = self.POD(points_f2, frame_counts, len(points_f2[:, 4]) / frame_counts)
+        POD_f3 = self.POD(points_f3, frame_counts, len(points_f3[:, 4]) / frame_counts)
+        res = [POD_f0, POD_f1, POD_f2, POD_f3]
+        return res
 
     def Calculate_Center_Of_Mess(self, pts_sel):
         """

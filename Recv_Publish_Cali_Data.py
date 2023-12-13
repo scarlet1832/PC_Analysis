@@ -30,101 +30,7 @@ class Recv_Publish:
         self.analysis = DataAnalysisExtract.Analysis()
         self.point_cloud_array = []
         self.stop = False
-        self.frame_counts = 3
-        # self.fields_wanted = ['flags', 'flag', 'scan_id', 'scanline', 'scan_idx', 'x', 'y', 'z', 'intensity',
-        #                       'reflectance', 'frame_idx', 'frame_id', 'elongation', 'is_2nd_return', 'multi_return',
-        #                       'timestamp', 'channel', 'roi', 'facet', 'confid_level']
-        # self.fields_index_dict = {'flags':None, 'flag':None, 'scan_id':None, 'scanline':None,'scan_idx':None, 'x':None, 'y':None, 'z':None, 'intensity':None, 'reflectance':None, 'frame_idx':None,
-        #                             'frame_id':None, 'elongation':None, 'is_2nd_return':None, 'multi_return':None,'timestamp':None, 'channel':None, 'roi':None, 'facet':None, 'confid_level':None}
-        # self.new_fields_index_dict = {'None':None}
-        # self.index_sort = np.zeros((len(self.fields_wanted)), dtype=int)
-        # self.LiDAR_model_list = ['K', 'W', 'E']
-        # self.LiDAR_model = []
-        # self.Horizontal_R = [0.09, 0.13, 0.14] # K, W, E
-        # self.Vertical_R = [0.08, 0.37, 0.182]
-
-    
-
-    # def sort_fields(self, res, fields):
-    #     # print(fields)
-    #     # Make the data order conform to 'fields_wanted'
-    #     if self.topic == "/rviz_selected_points":
-    #         fields_wanted = self.fields_wanted
-    #     else:
-    #         fields_wanted = self.fields_wanted_cali
-    #     for i in range(len(fields_wanted)):
-    #         for j in range(len(fields)):
-    #             if fields_wanted[i] == fields[j]:
-    #                 self.index_sort[i] = j
-    #                 break
-    #             else:
-    #                 self.index_sort[i] = -1
-    #     j = 0
-    #     new_sort = np.zeros(len(fields), dtype=int)
-    #     for i in range(len(self.index_sort)):
-    #         if self.index_sort[i] != -1:
-    #             new_sort[j] = self.index_sort[i]
-    #             j += 1
-    #     sorted_fields = list(range(len(new_sort)))
-    #     for i in range(len(new_sort)):
-    #         sorted_fields[i] = fields[new_sort[i]]
-    #     res = res[:, new_sort]
-    #     print(sorted_fields)
-    #     self.update_field_dict(sorted_fields)
-    #     self.update_field_index()
-    #     # Differentiating LiDAR types through scanning beam patterns
-    #     if self.scanline == None:
-    #         return res, sorted_fields
-    #     else:
-    #         max_scanline = max(res[:, self.scanline])
-    #     max_scanline = 127
-    #     if max_scanline <= 39:
-    #         self.LiDAR_model = self.LiDAR_model_list[0]
-    #     elif max_scanline > 39 and max_scanline <= 127:
-    #         self.LiDAR_model = self.LiDAR_model_list[2]
-    #     elif max_scanline > 127:
-    #         self.LiDAR_model = self.LiDAR_model_list[1]
-    #     return res, sorted_fields
-    
-    # def update_field_index(self):
-    #     # self.flag = self.new_fields_index_dict['facet']
-    #     self.scanline = self.new_fields_index_dict['scan_id']
-    #     self.x = self.new_fields_index_dict['x']
-    #     self.y = self.new_fields_index_dict['y']
-    #     self.z = self.new_fields_index_dict['z']
-    #     # self.f = self.new_fields_index_dict['frame_idx']
-    #     self.intensity = self.new_fields_index_dict['intensity']
-    
-    # def update_field_dict(self, sorted_fields):
-    #     New_Dict = {}
-    #     if self.topic == "/rviz_selected_points":
-    #         fields_index_dict = self.fields_index_dict
-    #     else:
-    #         fields_index_dict = self.fields_index_dict_cali
-    #     print(self.topic, fields_index_dict)
-    #     for i in range(len(sorted_fields)):
-    #         for key in fields_index_dict:
-    #             if sorted_fields[i] == key:
-    #                 fields_index_dict[key] = i
-    #     # # 处理 'flag' 键
-    #     # New_Dict['flag'] = fields_index_dict['flags'] if fields_index_dict['flags'] is not None else fields_index_dict['flag']
-
-    #     # # 处理 'scanline' 键
-    #     # New_Dict['scan_id'] = fields_index_dict['scanline'] if fields_index_dict['scanline'] is not None else fields_index_dict['scan_id']
-            
-    #     # # 处理 'intensity' 键
-    #     # New_Dict['intensity'] = fields_index_dict['intensity'] if fields_index_dict['intensity'] is not None else fields_index_dict['reflectance']
-        
-    #     # # 处理 'frame_idx' 键
-    #     # New_Dict['frame_idx'] = fields_index_dict['frame_idx'] if fields_index_dict['frame_idx'] is not None else fields_index_dict['frame_id']
-        
-    #     # 遍历其他键值对，将非 None 值添加到新字典
-    #     for key, value in fields_index_dict.items():
-    #         # if value is not None and key not in ['frame_idx', 'frame_id', 'scanline', 'scan_id']:
-    #         New_Dict[key] = value
-                
-    #     self.new_fields_index_dict = New_Dict
-    #     print(self.new_fields_index_dict)
+        self.frame_counts = 2
 
     def connect_data_analysis_get_bounding(self, point_cloud_nparray, fields):
         points, sorted_fields= self.analysis.extract.sort_fields(point_cloud_nparray, fields, self.topic)
@@ -140,17 +46,19 @@ class Recv_Publish:
         self.point_cloud_array = []
         self.stop_subscriber()
         self.update_topic()
-    
+
     def connect_data_analysis_apply_bounding(self, point_cloud_nparray, fields):
         points_all, sorted_fields= self.analysis.extract.sort_fields(point_cloud_nparray, fields, self.topic)
         self.analysis.Update_index()
-        points = self.analysis.Filter_xyz(points_all, [], self.BoundingBox, []) 
+        points = self.analysis.Filter_xyz(points_all, [], self.BoundingBox, [], [])
         # self.Write_CSV(points, sorted_fields)
-        POD = self.analysis.POD(points, self.frame_counts, len(points[:, 4]) / self.frame_counts)
+        Diff_Facet_POD = self.analysis.Calculate_Diff_Facet_POD(points_all, self.frame_counts)
+        # POD = self.analysis.POD(points, self.frame_counts, len(points[:, 4]) / self.frame_counts)
         # Precision = self.analysis.fitting_plane.Extract_point_fitting_plane(points, [0,100], self.topic)
         # MeanIntensity = np.mean(points[:, self.analysis.extract.intensity])
         # print("MeanIntensity:", MeanIntensity)
         # FOVROI = self.analysis.Analyze_FOVROI_Angular_Resolution(points_all, sorted_fields)
+        
         if self.i == self.frame_counts:
             self.i = 0
             self.sign = 0
