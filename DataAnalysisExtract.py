@@ -948,7 +948,7 @@ class Fitting_plane:
         print(topic)
         if topic != '/iv_points' and topic != 'iv_points':
             # xyzs = pts_sel[:,0:3]
-            xyzs = pts_sel[:,2:5]
+            xyzs = pts_sel[:,3:6]
 
         # RANSAC
         for i in range(2):
