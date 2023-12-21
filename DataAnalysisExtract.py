@@ -336,12 +336,12 @@ class Extract:
             self.flag = self.new_fields_index_dict['flag']
             self.scanline = self.new_fields_index_dict['scanline']
             self.f = self.new_fields_index_dict['frame_idx']
-        # else:
-            # self.scanline = self.new_fields_index_dict['scan_id']
+        else:
+            self.scanline = self.new_fields_index_dict['scan_id']
         self.x = self.new_fields_index_dict['x']
         self.y = self.new_fields_index_dict['y']
         self.z = self.new_fields_index_dict['z']
-        # self.intensity = self.new_fields_index_dict['intensity']
+        self.intensity = self.new_fields_index_dict['intensity']
         
 class Analysis:
 
@@ -514,8 +514,6 @@ class Analysis:
     def Calculate_facet01_fitting_plane(self, pts_sel, topic, ground):
         points_0 = self.Filter_xyz(pts_sel, [], [], [], 0)
         points_1 = self.Filter_xyz(pts_sel, [], [], [], 1)
-        print(self.Get_Max_Width_Height(points_0))
-        print(self.Get_Max_Width_Height(points_1))
         Precision0 = self.fitting_plane.Extract_point_fitting_plane(points_0, [0,100], topic, ground)
         Precision1 = self.fitting_plane.Extract_point_fitting_plane(points_1, [0,100], topic, ground)
         angle = self.Calculate_fitting_plane_angle(Precision0, Precision1, ground)
@@ -833,13 +831,14 @@ class Analysis:
     def Calculate_Diff_Facet_POD(self, pts_sel, frame_counts):
         points_f0 = self.Filter_xyz(pts_sel, [], [], [], 0)
         points_f1 = self.Filter_xyz(pts_sel, [], [], [], 1) 
-        points_f2 = self.Filter_xyz(pts_sel, [], [], [], 2) 
-        points_f3 = self.Filter_xyz(pts_sel, [], [], [], 3)
+        # points_f2 = self.Filter_xyz(pts_sel, [], [], [], 2)
+        # points_f3 = self.Filter_xyz(pts_sel, [], [], [], 3)
         POD_f0 = self.POD(points_f0, frame_counts, len(points_f0[:, 4]) / frame_counts)
         POD_f1 = self.POD(points_f1, frame_counts, len(points_f1[:, 4]) / frame_counts)
-        POD_f2 = self.POD(points_f2, frame_counts, len(points_f2[:, 4]) / frame_counts)
-        POD_f3 = self.POD(points_f3, frame_counts, len(points_f3[:, 4]) / frame_counts)
-        res = [POD_f0, POD_f1, POD_f2, POD_f3]
+        # POD_f2 = self.POD(points_f2, frame_counts, len(points_f2[:, 4]) / frame_counts)
+        # POD_f3 = self.POD(points_f3, frame_counts, len(points_f3[:, 4]) / frame_counts)
+        # res = [POD_f0, POD_f1, POD_f2, POD_f3]
+        res = [POD_f0, POD_f1]
         return res
 
     def Calculate_Center_Of_Mess(self, pts_sel):
@@ -939,8 +938,24 @@ class Fitting_plane:
                 best_std_dev = std_dev
                 best_model = a, b, c
                 best_num_inliers = num_inliers
+                best_inliers_temp = inliers_temp
         print('best_model:', best_model, 'best_num_inliers', best_num_inliers, 'best_std_dev', best_std_dev, 'sum_pts', xyzs.shape[0])
-        return best_model, best_std_dev
+        return best_model, best_std_dev, best_inliers_temp
+    
+    def calculate_plane_thickness(self, points, model):
+        # 定义平面方程系数
+        a, b, c = model
+
+        # 定义平面法向量
+        normal_vector = np.array([-1, a, b])  # 平面法向量为 (a, b, -1)
+
+        # 计算点到平面的距离
+        distances = (np.dot(points, normal_vector) + c) / np.linalg.norm(normal_vector)
+        distances = abs(max(distances)) + abs(min(distances))
+
+        # 输出结果
+        print(distances)
+
 
     def fit_plane(self, xyzs, ground):
         """
@@ -985,7 +1000,7 @@ class Fitting_plane:
         max_iterations = 1500
         n = pts_sel.shape[0]
         goal_inliers = n * 0.95
-        threshold= 0.08
+        threshold= 0.09
         best_std_dev = float('inf')
         # points data
         xyzs = pts_sel[:,3:6]
@@ -996,10 +1011,12 @@ class Fitting_plane:
         print(len(xyzs))
         # RANSAC
         for i in range(2):
-            model, std_dev = self.fit_plane_Ransac(xyzs, threshold, max_iterations, ground)
+            model, std_dev, inliers_temp = self.fit_plane_Ransac(xyzs, threshold, max_iterations, ground)
             if std_dev < best_std_dev:
                 best_std_dev = std_dev
                 best_model = model
+                best_inliers_temp = inliers_temp
+        self.calculate_plane_thickness(best_inliers_temp, best_model)
         a, b, c = best_model
         Precision = ['a', a, 'b', b, 'c', c, 'sigma', best_std_dev]
         print(Precision)

@@ -30,15 +30,15 @@ class Recv_Publish:
         self.analysis = DataAnalysisExtract.Analysis()
         self.point_cloud_array = []
         self.stop = False
-        self.frame_counts = 30
+        self.frame_counts = 1
 
     def connect_data_analysis_get_bounding(self, point_cloud_nparray, fields):
         points, sorted_fields= self.analysis.extract.sort_fields(point_cloud_nparray, fields, self.topic)
         self.BoundingBox = self.analysis.Get_Max_Min_xyz(points)
-        # self.BoundingBox[0] -= 0.15
-        # self.BoundingBox[1] += 0.15
-        # self.BoundingBox[2] -= 0.15
-        # self.BoundingBox[3] += 0.15
+        self.BoundingBox[0] -= 0.15
+        self.BoundingBox[1] += 0.15
+        self.BoundingBox[2] -= 0.15
+        self.BoundingBox[3] += 0.15
         self.BoundingBox[4] -= 0.15
         self.BoundingBox[5] += 0.15
         print("Get boundingBox:", self.BoundingBox)
@@ -52,18 +52,23 @@ class Recv_Publish:
         self.analysis.Update_index()
         points = self.analysis.Filter_xyz(points_all, [], self.BoundingBox, [], None)
         # self.Write_CSV(points, sorted_fields)
-        Diff_Facet_POD = self.analysis.Calculate_Diff_Facet_POD(points_all, self.frame_counts)
+
+        # Diff_Facet_POD = self.analysis.Calculate_Diff_Facet_POD(points_all, self.frame_counts)
+
         # POD = self.analysis.POD(points, self.frame_counts, len(points[:, 4]) / self.frame_counts)
+
         # distance = self.analysis.get_points_distance(points)
         # Precision = self.analysis.fitting_plane.Extract_point_fitting_plane(points, [0,100], self.topic, ground=0)
-        # angle = self.analysis.Calculate_facet01_fitting_plane(points, self.topic, ground=1)
+
+        angle = self.analysis.Calculate_facet01_fitting_plane(points, self.topic, ground=1)
+
         # Noise = len(points_all[:, 4]) / self.frame_counts
+        # print("Noise Number:", Noise)
 
         # point_015_number = points_all[np.where(points_all[:, 11] <= 600)]
         # self.Write_CSV(point_015_number, sorted_fields)
         # print(len(point_015_number[:, 1])/self.frame_counts)
 
-        # print("Noise Number:", Noise)
         # MeanIntensity = np.mean(points[:, 7])
         # print("MeanIntensity:", MeanIntensity)
         # FOVROI = self.analysis.Analyze_FOVROI_Angular_Resolution(points_all, sorted_fields)
