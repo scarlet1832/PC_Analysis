@@ -336,12 +336,12 @@ class Extract:
             self.flag = self.new_fields_index_dict['flag']
             self.scanline = self.new_fields_index_dict['scanline']
             self.f = self.new_fields_index_dict['frame_idx']
-        else:
-            self.scanline = self.new_fields_index_dict['scan_id']
+        # else:
+            # self.scanline = self.new_fields_index_dict['scan_id']
         self.x = self.new_fields_index_dict['x']
         self.y = self.new_fields_index_dict['y']
         self.z = self.new_fields_index_dict['z']
-        self.intensity = self.new_fields_index_dict['intensity']
+        # self.intensity = self.new_fields_index_dict['intensity']
         
 class Analysis:
 
@@ -351,7 +351,7 @@ class Analysis:
         self.target_height = 1.50
         self.target_width = 1.50
         self.Horizontal_R = [0.09, 0.13, 0.1] # K, W, E
-        self.Vertical_R = [0.08, 0.37, 0.182]
+        self.Vertical_R = [0.08, 0.37, 0.18]
         self.index = 0
         self.q = Queue()
         # LaserSpot = round(0.00087 * distance * 2, 3)
@@ -499,7 +499,7 @@ class Analysis:
             i = FrameLimit[0]
             distance = self.get_points_distance(pts_sel)
             pts_sel_temp = pts_sel[np.where((pts_sel[:, self.extract.f] >= i) & (pts_sel[:, self.extract.f] < i + distance / 3))]
-            Precision = self.fitting_plane.Extract_point_fitting_plane(pts_sel_temp, FrameLimit, self.extract.topic)
+            Precision = self.fitting_plane.Extract_point_fitting_plane(pts_sel_temp, FrameLimit, self.extract.topic, ground=0)
         if case[4] == 1:
             POD = self.POD(pts_sel, frame_counts, len(pts_sel[:, 4]) / frame_counts)
         results.extend([FOVROI])
@@ -511,6 +511,40 @@ class Analysis:
         
         return results
     
+    def Calculate_facet01_fitting_plane(self, pts_sel, topic):
+        points_0 = self.Filter_xyz(pts_sel, [], [], [], 0)
+        points_1 = self.Filter_xyz(pts_sel, [], [], [], 1)
+        Precision0 = self.fitting_plane.Extract_point_fitting_plane(points_0, [0,100], topic, ground=1)
+        Precision1 = self.fitting_plane.Extract_point_fitting_plane(points_1, [0,100], topic, ground=1)
+        angle = self.Calculate_fitting_plane_angle(Precision0, Precision1)
+        return angle
+    
+    def Calculate_fitting_plane_angle(self, precision1, precision2):
+        # 定义两个平面的参数
+        _, a1, _, b1, _, c1, _, sigma1 = precision1
+        _, a2, _, b2, _, c1, _, sigma1 = precision2
+
+        # 计算法线向量
+        N1 = np.array([a1, b1, -1])
+        N2 = np.array([a2, b2, -1])
+
+        # 计算法线向量的模长
+        N1_modulus = np.sqrt((N1*N1).sum())
+        N2_modulus = np.sqrt((N2*N2).sum())
+
+        # 计算两个向量的点积 
+        dots = np.dot(N1, N2)
+
+        # 计算夹角的余弦值
+        cos_theta = dots / (N1_modulus * N2_modulus)
+
+        # 使用 arccos() 函数得到夹角, 并转换为度数
+        theta = math.acos(cos_theta)
+        theta = math.degrees(theta) # 可以略过这行如果保持弧度制
+
+        print(f"两个平面的法线向量夹角为 {round(theta, 5)} 度")
+        return theta
+
     def get_points_frame_by_frame(self, pts_sel, FrameLimit):
         distance = []
         PointsNum = []
@@ -615,9 +649,9 @@ class Analysis:
             xmin, xmax, ymin, ymax, zmin, zmax = (
              bounding_box[0], bounding_box[1], bounding_box[2], bounding_box[3],
              bounding_box[4], bounding_box[5])
-            input_array = input_array[np.where((input_array[:, x] > xmin) & (input_array[:, x] < xmax))]
-            input_array = input_array[np.where((input_array[:, y] > ymin) & (input_array[:, y] < ymax))]
-            input_array = input_array[np.where((input_array[:, z] > zmin) & (input_array[:, z] < zmax))]
+            input_array = input_array[np.where((input_array[:, x] >= xmin) & (input_array[:, x] <= xmax))]
+            input_array = input_array[np.where((input_array[:, y] >= ymin) & (input_array[:, y] <= ymax))]
+            input_array = input_array[np.where((input_array[:, z] >= zmin) & (input_array[:, z] <= zmax))]
         # print(xmin, xmax, ymin, ymax, zmin, zmax , x, y, z)
         # print('**************2', input_array.shape[0])
         if bool(intensity_bounding):
@@ -832,7 +866,7 @@ class Fitting_plane:
     def __init__(self):
         pass
 
-    def fitting_plane_LSM(self, xyzs):
+    def fitting_plane_LSM(self, xyzs, ground):
         """
         使用最小二乘法拟合平面
 
@@ -843,8 +877,12 @@ class Fitting_plane:
             _type_: _description_
         """
         x, y, z = xyzs.T
-        A = np.column_stack((x, y, np.ones_like(x)))
-        B = z.reshape(-1, 1)
+        if ground == 0:
+            A = np.column_stack((x, y, np.ones_like(x)))
+            B = z.reshape(-1, 1)
+        elif ground == 1:
+            A = np.column_stack((y, z, np.ones_like(y)))
+            B = x.reshape(-1, 1)
 
         # 使用numpy.linalg.lstsq()计算最小二乘解
         X, residuals, _, _ = np.linalg.lstsq(A, B, rcond=None)
@@ -861,7 +899,7 @@ class Fitting_plane:
 
         return a, b, c, standard_deviation
     
-    def fit_plane_Ransac(self, xyzs, threshold=0.01, max_iterations=1000):
+    def fit_plane_Ransac(self, xyzs, threshold=0.01, max_iterations=1000, ground=0):
         """
         使用RANSAC算法从三维点云中拟合最佳平面
         参数:
@@ -881,14 +919,14 @@ class Fitting_plane:
             sample_xyzs = xyzs[sample_indices]
 
             # 使用这三个点拟合平面
-            model = self.fit_plane(sample_xyzs)
+            model = self.fit_plane(sample_xyzs, ground)
 
             # 计算其他所有点到该平面的距离，并用最小二乘拟合内点平面求标准差
             dists = self.pts_to_plane_distance(model, xyzs)
             inlier_indices = np.where(dists < threshold)[0]
             num_inliers = len(inlier_indices)
             inliers_temp = xyzs[inlier_indices]
-            a, b, c, std_dev = self.fitting_plane_LSM(inliers_temp)
+            a, b, c, std_dev = self.fitting_plane_LSM(inliers_temp, ground)
 
             # 更新最佳模型
             if num_inliers > best_num_inliers or (num_inliers == best_num_inliers and std_dev < best_std_dev):
@@ -898,7 +936,7 @@ class Fitting_plane:
         print('best_model:', best_model, 'best_num_inliers', best_num_inliers, 'best_std_dev', best_std_dev, 'sum_pts', xyzs.shape[0])
         return best_model, best_std_dev
 
-    def fit_plane(self, xyzs):
+    def fit_plane(self, xyzs, ground):
         """
         使用向量计算平面方程
         参数:
@@ -932,7 +970,7 @@ class Fitting_plane:
         distance = np.nan_to_num(distance, nan=0.0, posinf=0.0, neginf=0.0)
         return distance
     
-    def Extract_point_fitting_plane(self, pts_sel, FrameLimit, topic):
+    def Extract_point_fitting_plane(self, pts_sel, FrameLimit, topic, ground):
         """
         Extract points to fitting plane
             Args:
@@ -947,12 +985,12 @@ class Fitting_plane:
         xyzs = pts_sel[:,3:6]
         print(topic)
         if topic != '/iv_points' and topic != 'iv_points':
-            # xyzs = pts_sel[:,0:3]
-            xyzs = pts_sel[:,3:6]
-
+            xyzs = pts_sel[:,0:3]
+            # xyzs = pts_sel[:,3:6]
+        print(len(xyzs))
         # RANSAC
         for i in range(2):
-            model, std_dev = self.fit_plane_Ransac(xyzs, threshold, max_iterations)
+            model, std_dev = self.fit_plane_Ransac(xyzs, threshold, max_iterations, ground)
             if std_dev < best_std_dev:
                 best_std_dev = std_dev
                 best_model = model
