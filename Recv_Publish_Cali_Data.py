@@ -30,7 +30,7 @@ class Recv_Publish:
         self.analysis = DataAnalysisExtract.Analysis()
         self.point_cloud_array = []
         self.stop = False
-        self.frame_counts = 1
+        self.frame_counts = 30
 
     def connect_data_analysis_get_bounding(self, point_cloud_nparray, fields):
         points, sorted_fields= self.analysis.extract.sort_fields(point_cloud_nparray, fields, self.topic)
@@ -59,7 +59,8 @@ class Recv_Publish:
         # angle = self.analysis.Calculate_facet01_fitting_plane(points, self.topic, ground=1)
         # Noise = len(points_all[:, 4]) / self.frame_counts
         point_015_number = points_all[np.where(points_all[:, 11] <= 600)]
-        point_015_number = len(point_015_number[:, 1])/self.frame_counts
+        self.Write_CSV(point_015_number, sorted_fields)
+        print(len(point_015_number[:, 1])/self.frame_counts)
         # print("Noise Number:", Noise)
         # MeanIntensity = np.mean(points[:, 7])
         # print("MeanIntensity:", MeanIntensity)
