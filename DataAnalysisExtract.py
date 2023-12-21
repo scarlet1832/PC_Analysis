@@ -511,22 +511,28 @@ class Analysis:
         
         return results
     
-    def Calculate_facet01_fitting_plane(self, pts_sel, topic):
+    def Calculate_facet01_fitting_plane(self, pts_sel, topic, ground):
         points_0 = self.Filter_xyz(pts_sel, [], [], [], 0)
         points_1 = self.Filter_xyz(pts_sel, [], [], [], 1)
-        Precision0 = self.fitting_plane.Extract_point_fitting_plane(points_0, [0,100], topic, ground=1)
-        Precision1 = self.fitting_plane.Extract_point_fitting_plane(points_1, [0,100], topic, ground=1)
-        angle = self.Calculate_fitting_plane_angle(Precision0, Precision1)
+        print(self.Get_Max_Width_Height(points_0))
+        print(self.Get_Max_Width_Height(points_1))
+        Precision0 = self.fitting_plane.Extract_point_fitting_plane(points_0, [0,100], topic, ground)
+        Precision1 = self.fitting_plane.Extract_point_fitting_plane(points_1, [0,100], topic, ground)
+        angle = self.Calculate_fitting_plane_angle(Precision0, Precision1, ground)
         return angle
     
-    def Calculate_fitting_plane_angle(self, precision1, precision2):
+    def Calculate_fitting_plane_angle(self, precision1, precision2, ground=1):
         # 定义两个平面的参数
         _, a1, _, b1, _, c1, _, sigma1 = precision1
         _, a2, _, b2, _, c1, _, sigma1 = precision2
 
-        # 计算法线向量
-        N1 = np.array([a1, b1, -1])
-        N2 = np.array([a2, b2, -1])
+        # 计算法线向
+        if ground == 0:
+            N1 = np.array([a1, b1, -1])
+            N2 = np.array([a2, b2, -1])
+        elif ground == 1:
+            N1 = np.array([1, -a1, -b1])
+            N2 = np.array([1, -a2, -b2])
 
         # 计算法线向量的模长
         N1_modulus = np.sqrt((N1*N1).sum())
@@ -985,8 +991,8 @@ class Fitting_plane:
         xyzs = pts_sel[:,3:6]
         print(topic)
         if topic != '/iv_points' and topic != 'iv_points':
-            xyzs = pts_sel[:,0:3]
-            # xyzs = pts_sel[:,3:6]
+            # xyzs = pts_sel[:,0:3]
+            xyzs = pts_sel[:,3:6]
         print(len(xyzs))
         # RANSAC
         for i in range(2):
