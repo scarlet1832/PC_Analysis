@@ -1,6 +1,7 @@
 import sys
 sys.path.append("/home/demo/Documents/DataAnalysis")
 print(sys.path)
+import pandas as pd
 from Analysis.DataAnalysisExtract import Analysis
 from GUI.Bag_Analysis_Main import Ui_Data_Analysis
 from GUI.Bag_Analysis_child import Ui_AnalysisResult

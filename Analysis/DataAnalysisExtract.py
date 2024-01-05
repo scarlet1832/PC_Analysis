@@ -13,7 +13,7 @@ import pandas as pd
 import rosbag
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2, PointField
-import ExcelOperation
+import Analysis.ExcelOperation as ExcelOperation
 import random
 from sklearn.cluster import KMeans
 from sklearn.cluster import DBSCAN
@@ -51,15 +51,15 @@ class Extract:
         self.new_fields_index_dict = {'None':None}
         self.fields_wanted_cali = ['facet', 'scan_id', 'scan_idx', 'x', 'y', 'z', 'intensity',
                               'reflectance', 'frame_id', 'echo', 'channel', 'radius', 'h_angle',
-                              'v_angle', 'roi', 'ref_intensity', 'poly_angle', 'galvo_angle']
+                              'v_angle', 'roi', 'ref_intensity', 'poly_angle', 'galvo_angle', 'galvo_direction']
         self.fields_index_dict_cali = {'facet':None, 'scan_id':None, 'scan_idx':None, 'x':None, 'y':None, 'z':None, 'intensity':None,
                               'reflectance':None, 'frame_id':None, 'echo':None, 'channel':None, 'radius':None, 'h_angle':None,
-                              'v_angle':None, 'roi':None, 'ref_intensity':None, 'poly_angle':None, 'galvo_angle':None}
+                              'v_angle':None, 'roi':None, 'ref_intensity':None, 'poly_angle':None, 'galvo_angle':None, 'galvo_direction':None}
         self.new_fields_index_dict_cali = {'None':None}
         self.index_sort = np.zeros((len(self.fields_wanted)), dtype=int)
         self.topics = ['/iv_points', '/AT128/pandar_points', '/rslidar_points', 'iv_points']
         self.topic = ''
-        self.LiDAR_model_list = ['K', 'W', 'E']
+        self.LiDAR_model_list = ['K', 'W', 'E', 'C']
         self.LiDAR_model = []
 
     def get_pointcloud2(self, msg):
@@ -254,13 +254,15 @@ class Extract:
             return res, sorted_fields
         else:
             max_scanline = max(res[:, self.scanline])
-        # max_scanline = 39
-        if max_scanline <= 39:
+
+        if 9 <= max_scanline and max_scanline <= 39:
             self.LiDAR_model = self.LiDAR_model_list[0]
         elif max_scanline > 39 and max_scanline <= 127:
             self.LiDAR_model = self.LiDAR_model_list[2]
         elif max_scanline > 127:
             self.LiDAR_model = self.LiDAR_model_list[1]
+        elif max_scanline <= 8:
+            self.LiDAR_model = self.LiDAR_model_list[3]
         print("Lidar is:", self.LiDAR_model)
         return res, sorted_fields
             
@@ -350,8 +352,8 @@ class Analysis:
         self.fitting_plane = Fitting_plane()
         self.target_height = 1.50
         self.target_width = 1.50
-        self.Horizontal_R = [0.09, 0.13, 0.1] # K, W, E
-        self.Vertical_R = [0.08, 0.37, 0.18]
+        self.Horizontal_R = [0.09, 0.13, 0.1, 0.095] # K, W, E, C
+        self.Vertical_R = [0.08, 0.37, 0.18, 0.1]
         self.index = 0
         self.q = Queue()
         # LaserSpot = round(0.00087 * distance * 2, 3)
@@ -429,6 +431,8 @@ class Analysis:
             self.index = 1
         elif self.extract.LiDAR_model == 'E':
             self.index = 2
+        elif self.extract.LiDAR_model == 'C':
+            self.index = 3
         
     def Update_xyz_index(self):
         if self.extract.topic != '/iv_points' and self.extract.topic != 'iv_points':
@@ -636,7 +640,7 @@ class Analysis:
          'Intensity Variance', pts_sel_var, 'Intensity Standard Deviation', pts_sel_std_1]
         return results
 
-    def Filter_xyz(self, input_array, framelimit, bounding_box, intensity_bounding, facet):
+    def Filter_xyz(self, input_array, framelimit, bounding_box, intensity_bounding, facet=None, scanid=None):
         """
         Select points within the ‘bounding_box’
         """
@@ -648,7 +652,7 @@ class Analysis:
             frame_max = framelimit[1]
             frame_min = framelimit[0]
             input_array = input_array[np.where((input_array[:, f] > frame_min - 1) & (input_array[:, f] < frame_max + 1))]
-        # print('**************1', input_array.shape[0])
+
         if bool(bounding_box):
             xmin, xmax, ymin, ymax, zmin, zmax = (
              bounding_box[0], bounding_box[1], bounding_box[2], bounding_box[3],
@@ -656,13 +660,16 @@ class Analysis:
             input_array = input_array[np.where((input_array[:, x] >= xmin) & (input_array[:, x] <= xmax))]
             input_array = input_array[np.where((input_array[:, y] >= ymin) & (input_array[:, y] <= ymax))]
             input_array = input_array[np.where((input_array[:, z] >= zmin) & (input_array[:, z] <= zmax))]
-        # print(xmin, xmax, ymin, ymax, zmin, zmax , x, y, z)
-        # print('**************2', input_array.shape[0])
+
         if bool(intensity_bounding):
             input_array = input_array[np.where((input_array[:, 6] >= intensity_bounding[0]) & (input_array[:, 6] <= intensity_bounding[1]))]
-        # print('**************3', input_array.shape[0])
+
         if facet != None:
             input_array = input_array[np.where(input_array[:, 0] == facet)]
+
+        if bool(scanid):
+            input_array = input_array[np.where(input_array[:, 1] == scanid)]
+
         return input_array
 
     def Run_Cluster(self, pts):
@@ -686,21 +693,32 @@ class Analysis:
         pts = Cluster.find_largest_cluster_DBSCAN(pts, 2, 5, self.extract.x,self.extract.z)
         return pts
 
-    def POD(self, pts, frame_count, real_points):
+    def POD(self, pts, frame_count, real_points, Width=None, Height=None):
         """
         Calculate points POD within the ‘bounding_box’ or cluster result
         """
+        col = 0
         distance = self.get_points_distance(pts)
         Max_Width_Height = self.Get_Max_Width_Height(pts)
-        Width = Max_Width_Height[0]
-        Height = Max_Width_Height[1]
-        min_scanline = pts[np.where(pts[:,1] == min(pts[:,1]))][:, 1][0]
-        max_scanline = pts[np.where(pts[:,1] == max(pts[:,1]))][:, 1][0]
+        min_scanline = pts[np.where(pts[:, 1] == min(pts[:, 1]))][:, 1][0]
+        max_scanline = pts[np.where(pts[:, 1] == max(pts[:, 1]))][:, 1][0]
         print("Horizontal_R:", self.Horizontal_R[self.index], "Horizontal_V:", self.Vertical_R[self.index])
         print("min_scanline:", min_scanline, "max_scanline:", max_scanline)
-        row = math.floor(math.atan(Width / (2 * distance)) * 2 * 180 / math.pi / self.Horizontal_R[self.index])
-        # col = math.floor(math.atan(Height / (2 * distance)) * 2 * 180 / math.pi / self.Vertical_R[self.index])
-        col = max_scanline - min_scanline + 1
+        print("max_width:", Max_Width_Height[0], "max_height:", Max_Width_Height[1])
+        if Width == None:
+            Width = Max_Width_Height[0]
+        if Height == None:
+            if self.index == 3:
+                temp = pts[np.where(pts[:, 8] % 2 == 0)]
+                for i in np.unique(pts[:, 1].astype(int)):
+                    print(col)
+                    col += len(np.unique(pts[:, 10].astype(int)))
+            else:
+                col = max_scanline - min_scanline + 1
+        else:
+            col = math.floor(math.atan(Height / (2 * distance)) * 2 * 180 / math.pi / self.Vertical_R[self.index])
+        # row = math.floor(math.atan(Width / (2 * distance)) * 2 * 180 / math.pi / self.Horizontal_R[self.index])
+        row = math.atan(Width / (2 * distance)) * 2 * 180 / math.pi / self.Horizontal_R[self.index]
         print("row:", row, "col:", col)
         ideal_points = row * col
         pod = '{:.2%}'.format(real_points / ideal_points)
@@ -839,6 +857,16 @@ class Analysis:
         # POD_f3 = self.POD(points_f3, frame_counts, len(points_f3[:, 4]) / frame_counts)
         # res = [POD_f0, POD_f1, POD_f2, POD_f3]
         res = [POD_f0, POD_f1]
+        return res
+
+    def Calculate_Diff_Scanid_POD(self, pts_sel, frame_counts, width = None, height = None):
+        self.POD(pts_sel, frame_counts, len(pts_sel[:, 4]) / frame_counts, width, height)
+        scanid_list = np.unique(pts_sel[:, 1]).tolist()
+        res = []
+        for i in range(len(scanid_list)):
+            scanid_points = self.Filter_xyz(pts_sel, [], [], [], None, scanid_list[i])
+            res.append(self.POD(scanid_points, frame_counts, len(scanid_points[:, 4]) / frame_counts, width, height))
+
         return res
 
     def Calculate_Center_Of_Mess(self, pts_sel):
