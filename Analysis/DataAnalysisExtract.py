@@ -707,15 +707,16 @@ class Analysis:
         print("max_width:", Max_Width_Height[0], "max_height:", Max_Width_Height[1])
         if Width == None:
             Width = Max_Width_Height[0]
-        if Height == None:
+        if Height != None:
             if self.index == 3:
                 temp = pts[np.where(pts[:, 8] % 2 == 0)]
-                for i in np.unique(pts[:, 1].astype(int)):
+                for i in np.unique(temp[:, 1].astype(int)):
+                    col += len(np.unique(temp[:, 10].astype(int)))
                     print(col)
-                    col += len(np.unique(pts[:, 10].astype(int)))
             else:
                 col = max_scanline - min_scanline + 1
         else:
+            Height = Max_Width_Height[1]
             col = math.floor(math.atan(Height / (2 * distance)) * 2 * 180 / math.pi / self.Vertical_R[self.index])
         # row = math.floor(math.atan(Width / (2 * distance)) * 2 * 180 / math.pi / self.Horizontal_R[self.index])
         row = math.atan(Width / (2 * distance)) * 2 * 180 / math.pi / self.Horizontal_R[self.index]
