@@ -31,6 +31,7 @@ _DATATYPES[PointField.FLOAT32] = ('f', 4)
 _DATATYPES[PointField.FLOAT64] = ('d', 8)
 result = []
 
+
 class Extract:
 
     def __init__(self):
@@ -46,16 +47,22 @@ class Extract:
         self.fields_wanted = ['flags', 'flag', 'scan_id', 'scanline', 'scan_idx', 'x', 'y', 'z', 'intensity',
                               'reflectance', 'frame_idx', 'frame_id', 'elongation', 'is_2nd_return', 'multi_return',
                               'timestamp', 'channel', 'roi', 'facet', 'confid_level']
-        self.fields_index_dict = {'flags':None, 'flag':None, 'scan_id':None, 'scanline':None,'scan_idx':None, 'x':None, 'y':None, 'z':None, 'intensity':None, 'reflectance':None, 'frame_idx':None,
-                                    'frame_id':None, 'elongation':None, 'is_2nd_return':None, 'multi_return':None,'timestamp':None, 'channel':None, 'roi':None, 'facet':None, 'confid_level':None}
-        self.new_fields_index_dict = {'None':None}
+        self.fields_index_dict = {'flags': None, 'flag': None, 'scan_id': None, 'scanline': None, 'scan_idx': None,
+                                  'x': None, 'y': None, 'z': None, 'intensity': None, 'reflectance': None,
+                                  'frame_idx': None,
+                                  'frame_id': None, 'elongation': None, 'is_2nd_return': None, 'multi_return': None,
+                                  'timestamp': None, 'channel': None, 'roi': None, 'facet': None, 'confid_level': None}
+        self.new_fields_index_dict = {'None': None}
         self.fields_wanted_cali = ['facet', 'scan_id', 'scan_idx', 'x', 'y', 'z', 'intensity',
-                              'reflectance', 'frame_id', 'echo', 'channel', 'radius', 'h_angle',
-                              'v_angle', 'roi', 'ref_intensity', 'poly_angle', 'galvo_angle', 'galvo_direction']
-        self.fields_index_dict_cali = {'facet':None, 'scan_id':None, 'scan_idx':None, 'x':None, 'y':None, 'z':None, 'intensity':None,
-                              'reflectance':None, 'frame_id':None, 'echo':None, 'channel':None, 'radius':None, 'h_angle':None,
-                              'v_angle':None, 'roi':None, 'ref_intensity':None, 'poly_angle':None, 'galvo_angle':None, 'galvo_direction':None}
-        self.new_fields_index_dict_cali = {'None':None}
+                                   'reflectance', 'frame_id', 'echo', 'channel', 'radius', 'h_angle',
+                                   'v_angle', 'roi', 'ref_intensity', 'poly_angle', 'galvo_angle', 'galvo_direction']
+        self.fields_index_dict_cali = {'facet': None, 'scan_id': None, 'scan_idx': None, 'x': None, 'y': None,
+                                       'z': None, 'intensity': None,
+                                       'reflectance': None, 'frame_id': None, 'echo': None, 'channel': None,
+                                       'radius': None, 'h_angle': None,
+                                       'v_angle': None, 'roi': None, 'ref_intensity': None, 'poly_angle': None,
+                                       'galvo_angle': None, 'galvo_direction': None}
+        self.new_fields_index_dict_cali = {'None': None}
         self.index_sort = np.zeros((len(self.fields_wanted)), dtype=int)
         self.topics = ['/iv_points', '/AT128/pandar_points', '/rslidar_points', 'iv_points']
         self.topic = ''
@@ -64,13 +71,13 @@ class Extract:
 
     def get_pointcloud2(self, msg):
         ps = PointCloud2(header=(msg.header), height=1,
-          width=(msg.row_step / msg.point_step),
-          is_dense=False,
-          is_bigendian=(msg.is_bigendian),
-          fields=(msg.fields),
-          point_step=(msg.point_step),
-          row_step=(msg.row_step),
-          data=(msg.data))
+                         width=(msg.row_step / msg.point_step),
+                         is_dense=False,
+                         is_bigendian=(msg.is_bigendian),
+                         fields=(msg.fields),
+                         point_step=(msg.point_step),
+                         row_step=(msg.row_step),
+                         data=(msg.data))
         return ps
 
     def get_struct_fmt_map(slef, is_bigendian, fields):
@@ -218,14 +225,14 @@ class Extract:
             res, fields = self.get_pcap_data(file_path)
         else:
             print('Get data from file failed')
-            
+
         res, sorted_fields = self.sort_fields(res, fields, topic)
         return res, sorted_fields
-    
+
     def sort_fields(self, res, fields, topic):
         # print(fields)
         # Make the data order conform to 'fields_wanted'
-        if topic == "/rviz_selected_points":
+        if topic == "/rviz_selected_points" or topic == "/iv_points":
             fields_wanted = self.fields_wanted
         else:
             fields_wanted = self.fields_wanted_cali
@@ -265,7 +272,7 @@ class Extract:
             self.LiDAR_model = self.LiDAR_model_list[3]
         print("Lidar is:", self.LiDAR_model)
         return res, sorted_fields
-            
+
     def get_fold_files(self, path):
         """
         Determine whether it is a calibration bag file.
@@ -303,20 +310,28 @@ class Extract:
                     if sorted_fields[i] == key:
                         fields_index_dict[key] = i
             # 处理 'flag' 键
-            New_Dict['flag'] = self.fields_index_dict['flags'] if self.fields_index_dict['flags'] is not None else self.fields_index_dict['flag']
+            New_Dict['flag'] = self.fields_index_dict['flags'] if self.fields_index_dict['flags'] is not None else \
+            self.fields_index_dict['flag']
 
             # 处理 'scanline' 键
-            New_Dict['scanline'] = self.fields_index_dict['scanline'] if self.fields_index_dict['scanline'] is not None else self.fields_index_dict['scan_id']
-                
+            New_Dict['scanline'] = self.fields_index_dict['scanline'] if self.fields_index_dict[
+                                                                             'scanline'] is not None else \
+            self.fields_index_dict['scan_id']
+
             # 处理 'intensity' 键
-            New_Dict['intensity'] = self.fields_index_dict['intensity'] if self.fields_index_dict['intensity'] is not None else self.fields_index_dict['reflectance']
-            
+            New_Dict['intensity'] = self.fields_index_dict['intensity'] if self.fields_index_dict[
+                                                                               'intensity'] is not None else \
+            self.fields_index_dict['reflectance']
+
             # 处理 'frame_idx' 键
-            New_Dict['frame_idx'] = self.fields_index_dict['frame_idx'] if self.fields_index_dict['frame_idx'] is not None else self.fields_index_dict['frame_id']
-            
+            New_Dict['frame_idx'] = self.fields_index_dict['frame_idx'] if self.fields_index_dict[
+                                                                               'frame_idx'] is not None else \
+            self.fields_index_dict['frame_id']
+
             # 遍历其他键值对，将非 None 值添加到新字典
             for key, value in fields_index_dict.items():
-                if value is not None and key not in ['flags', 'flag', 'scanline', 'scan_id', 'intensity', 'reflectance', 'frame_idx', 'frame_id']:
+                if value is not None and key not in ['flags', 'flag', 'scanline', 'scan_id', 'intensity', 'reflectance',
+                                                     'frame_idx', 'frame_id']:
                     New_Dict[key] = value
 
         elif topic == "/cali_points":
@@ -329,10 +344,10 @@ class Extract:
             for key, value in fields_index_dict.items():
                 if value is not None:
                     New_Dict[key] = value
-                
+
         self.new_fields_index_dict = New_Dict
         print(self.new_fields_index_dict)
-        
+
     def update_field_index(self, topic):
         if topic != "/cali_points":
             self.flag = self.new_fields_index_dict['flag']
@@ -344,7 +359,8 @@ class Extract:
         self.y = self.new_fields_index_dict['y']
         self.z = self.new_fields_index_dict['z']
         self.intensity = self.new_fields_index_dict['intensity']
-        
+
+
 class Analysis:
 
     def __init__(self):
@@ -352,8 +368,8 @@ class Analysis:
         self.fitting_plane = Fitting_plane()
         self.target_height = 1.50
         self.target_width = 1.50
-        self.Horizontal_R = [0.09, 0.13, 0.1, 0.095] # K, W, E, C
-        self.Vertical_R = [0.08, 0.37, 0.18, 0.1]
+        self.Horizontal_R = [0.09, 0.13, 0.1, 0.095]  # K, W, E, C
+        self.Vertical_R = [0.08, 0.37, 0.1875, 0.1]
         self.index = 0
         self.q = Queue()
         # LaserSpot = round(0.00087 * distance * 2, 3)
@@ -415,7 +431,7 @@ class Analysis:
         else:
             print('File path No match distance')
             return 0
-        
+
     def get_filepath_ref(self, file_path):
         pattern = r'(\d+)ref'
         match = re.search(pattern, file_path)
@@ -425,7 +441,7 @@ class Analysis:
         else:
             print('File path No match ref')
             return 0
-    
+
     def Update_index(self):
         if self.extract.LiDAR_model == 'W':
             self.index = 1
@@ -433,7 +449,7 @@ class Analysis:
             self.index = 2
         elif self.extract.LiDAR_model == 'C':
             self.index = 3
-        
+
     def Update_xyz_index(self):
         if self.extract.topic != '/iv_points' and self.extract.topic != 'iv_points':
             self.extract.x = 0
@@ -441,12 +457,13 @@ class Analysis:
             self.extract.z = 2
             self.extract.intensity = 3
             self.extract.f = 4
-            
+
     def Update_Bounding_Intensity_box(self, file_path, BoundingBox, IntensityBox):
         Theory_distance = self.get_filepath_distance(file_path)
         Theory_ref = self.get_filepath_ref(file_path)
         if len(BoundingBox) == 0:
-            BoundingBox = [-1.5 * self.target_width, 1.5 * self.target_width, -1.5 * self.target_height, 1.5 * self.target_height, Theory_distance - 0.4, Theory_distance + 0.4]
+            BoundingBox = [-1.5 * self.target_width, 1.5 * self.target_width, -1.5 * self.target_height,
+                           1.5 * self.target_height, Theory_distance - 0.4, Theory_distance + 0.4]
 
         if len(IntensityBox) == 0:
             if Theory_ref == 10:
@@ -458,7 +475,7 @@ class Analysis:
             else:
                 print('No match ref')
         return BoundingBox, IntensityBox
-            
+
     def Calculate_data(self, file_path, FrameLimit, BoundingBox, IntensityBox, case, topic):
         """
         Calculate the POD, average number of points per frame in FOV/Bounding, and reflectivity information(Main)
@@ -487,8 +504,8 @@ class Analysis:
         pts = pts[~np.isnan(pts).any(axis=1)]
         pts_sel = self.Filter_xyz(pts, FrameLimit, BoundingBox, IntensityBox)
         if BoundingBox[0] == -1.5 * self.target_width and BoundingBox[1] == 1.5 * self.target_width:
-            pts_sel = self.Run_Cluster(pts_sel)           
-        pointnum_perframe = np.bincount(pts_sel[:, self.extract.f].astype(int).flatten(), minlength=FrameLimit[1]+1)
+            pts_sel = self.Run_Cluster(pts_sel)
+        pointnum_perframe = np.bincount(pts_sel[:, self.extract.f].astype(int).flatten(), minlength=FrameLimit[1] + 1)
         pointnum_perframe = pointnum_perframe[FrameLimit[0]:]
         frame_counts = len(pointnum_perframe)
         print('共分析： ', frame_counts, '帧')
@@ -502,8 +519,10 @@ class Analysis:
         if case[3] == 1:
             i = FrameLimit[0]
             distance = self.get_points_distance(pts_sel)
-            pts_sel_temp = pts_sel[np.where((pts_sel[:, self.extract.f] >= i) & (pts_sel[:, self.extract.f] < i + distance / 3))]
-            Precision = self.fitting_plane.Extract_point_fitting_plane(pts_sel_temp, FrameLimit, self.extract.topic, ground=0)
+            pts_sel_temp = pts_sel[
+                np.where((pts_sel[:, self.extract.f] >= i) & (pts_sel[:, self.extract.f] < i + distance / 3))]
+            Precision = self.fitting_plane.Extract_point_fitting_plane(pts_sel_temp, FrameLimit, self.extract.topic,
+                                                                       ground=0)
         if case[4] == 1:
             POD = self.POD(pts_sel, frame_counts, len(pts_sel[:, 4]) / frame_counts)
         results.extend([FOVROI])
@@ -512,17 +531,17 @@ class Analysis:
         results.extend([Precision])
         results.extend(POD)
         ExcelOperation.WritetToExcel(results, file_path)
-        
+
         return results
-    
+
     def Calculate_facet01_fitting_plane(self, pts_sel, topic, ground):
         points_0 = self.Filter_xyz(pts_sel, [], [], [], 0)
         points_1 = self.Filter_xyz(pts_sel, [], [], [], 1)
-        Precision0 = self.fitting_plane.Extract_point_fitting_plane(points_0, [0,100], topic, ground)
-        Precision1 = self.fitting_plane.Extract_point_fitting_plane(points_1, [0,100], topic, ground)
+        Precision0 = self.fitting_plane.Extract_point_fitting_plane(points_0, [0, 100], topic, ground)
+        Precision1 = self.fitting_plane.Extract_point_fitting_plane(points_1, [0, 100], topic, ground)
         angle = self.Calculate_fitting_plane_angle(Precision0, Precision1, ground)
         return angle
-    
+
     def Calculate_fitting_plane_angle(self, precision1, precision2, ground=1):
         # 定义两个平面的参数
         _, a1, _, b1, _, c1, _, sigma1 = precision1
@@ -537,8 +556,8 @@ class Analysis:
             N2 = np.array([1, -a2, -b2])
 
         # 计算法线向量的模长
-        N1_modulus = np.sqrt((N1*N1).sum())
-        N2_modulus = np.sqrt((N2*N2).sum())
+        N1_modulus = np.sqrt((N1 * N1).sum())
+        N2_modulus = np.sqrt((N2 * N2).sum())
 
         # 计算两个向量的点积 
         dots = np.dot(N1, N2)
@@ -548,7 +567,7 @@ class Analysis:
 
         # 使用 arccos() 函数得到夹角, 并转换为度数
         theta = math.acos(cos_theta)
-        theta = math.degrees(theta) # 可以略过这行如果保持弧度制
+        theta = math.degrees(theta)  # 可以略过这行如果保持弧度制
 
         print(f"两个平面的法线向量夹角为 {round(theta, 5)} 度")
         return theta
@@ -558,7 +577,7 @@ class Analysis:
         PointsNum = []
         flag0_PointsNum = []
         flag3_PointsNum = []
-        print(self.extract.f, self.extract.x,self.extract.y,self.extract.z)
+        print(self.extract.f, self.extract.x, self.extract.y, self.extract.z)
         for i in range(FrameLimit[0], FrameLimit[1] + 1):
             temp = self.Run_Cluster(pts_sel[np.where(pts_sel[:, self.extract.f] == i)])
             # if i % 20 == 0:
@@ -569,7 +588,8 @@ class Analysis:
             PointsNum.append(f'{len(temp)}')
             flag0_PointsNum.append(len(flag0))
             flag3_PointsNum.append(len(flag3))
-        print("distance: ", distance, "\npointsNum: ", PointsNum, "\nflag0Num: ", flag0_PointsNum, "\nflag3Num: ", flag3_PointsNum)
+        print("distance: ", distance, "\npointsNum: ", PointsNum, "\nflag0Num: ", flag0_PointsNum, "\nflag3Num: ",
+              flag3_PointsNum)
 
     def get_points_distance(self, pts_sel):
         """
@@ -608,11 +628,11 @@ class Analysis:
         print('目标点总体标准差为: %f' % pts_sel_std_1)
         print('目标点样本标准差为: %f' % pts_sel_std_2)
         results = [
-         ['FOV mean points', pts.shape[0] / frame_count, 'FOV sum points', pts.shape[0],
-          'FOV pointnum perframe', fov_pointnum_perframe.tolist(), 'target mean points', target_mean_points,
-          'target points Variance', pts_sel_var, 'target points Standard Deviation', pts_sel_std_1,
-          'target points per frame', pointnum_perframe.tolist(), 'Max Width', max_width_height[0],
-          'Max Height', max_width_height[1]]]
+            ['FOV mean points', pts.shape[0] / frame_count, 'FOV sum points', pts.shape[0],
+             'FOV pointnum perframe', fov_pointnum_perframe.tolist(), 'target mean points', target_mean_points,
+             'target points Variance', pts_sel_var, 'target points Standard Deviation', pts_sel_std_1,
+             'target points per frame', pointnum_perframe.tolist(), 'Max Width', max_width_height[0],
+             'Max Height', max_width_height[1]]]
         return results
 
     def Meanintensity_perframe(self, pts_sel, f, inten, FrameLimit):
@@ -620,12 +640,15 @@ class Analysis:
         Calculate_points_intensity
         """
         meanintensity_perframe = []
-        frame_min = FrameLimit[0]
-        frame_max = FrameLimit[1]
+        # frame_min = FrameLimit[0]
+        # frame_max = FrameLimit[1]
+        frame_min = int(pts_sel[:, 8].min())
+        frame_max = int(pts_sel[:, 8].max()) + 1
+        print("11111111111111111111111111", frame_max, frame_min)
         for i in range(frame_min, frame_max):
             a = pts_sel[np.where(pts_sel[:, f] == i)]
             meanintensity_perframe.append(np.mean(a[:, inten]))
-            
+
         intensity = np.mean(pts_sel[:, inten])
         pts_sel_var = np.var(meanintensity_perframe)
         pts_sel_std_1 = np.std(meanintensity_perframe)
@@ -637,7 +660,7 @@ class Analysis:
         print('intensity样本标准差为: %f' % pts_sel_std_2)
         meanintensity_perframe.extend([intensity])
         results = ['Mean Intensity', intensity, 'Mean Intensity Per Frame', meanintensity_perframe,
-         'Intensity Variance', pts_sel_var, 'Intensity Standard Deviation', pts_sel_std_1]
+                   'Intensity Variance', pts_sel_var, 'Intensity Standard Deviation', pts_sel_std_1]
         return results
 
     def Filter_xyz(self, input_array, framelimit, bounding_box, intensity_bounding, facet=None, scanid=None):
@@ -651,18 +674,20 @@ class Analysis:
         if bool(framelimit):
             frame_max = framelimit[1]
             frame_min = framelimit[0]
-            input_array = input_array[np.where((input_array[:, f] > frame_min - 1) & (input_array[:, f] < frame_max + 1))]
+            input_array = input_array[
+                np.where((input_array[:, f] > frame_min - 1) & (input_array[:, f] < frame_max + 1))]
 
         if bool(bounding_box):
             xmin, xmax, ymin, ymax, zmin, zmax = (
-             bounding_box[0], bounding_box[1], bounding_box[2], bounding_box[3],
-             bounding_box[4], bounding_box[5])
+                bounding_box[0], bounding_box[1], bounding_box[2], bounding_box[3],
+                bounding_box[4], bounding_box[5])
             input_array = input_array[np.where((input_array[:, x] >= xmin) & (input_array[:, x] <= xmax))]
             input_array = input_array[np.where((input_array[:, y] >= ymin) & (input_array[:, y] <= ymax))]
             input_array = input_array[np.where((input_array[:, z] >= zmin) & (input_array[:, z] <= zmax))]
 
         if bool(intensity_bounding):
-            input_array = input_array[np.where((input_array[:, 6] >= intensity_bounding[0]) & (input_array[:, 6] <= intensity_bounding[1]))]
+            input_array = input_array[
+                np.where((input_array[:, 6] >= intensity_bounding[0]) & (input_array[:, 6] <= intensity_bounding[1]))]
 
         if facet != None:
             input_array = input_array[np.where(input_array[:, 0] == facet)]
@@ -690,7 +715,7 @@ class Analysis:
         # pts1 = Cluster.find_largest_cluster_DBSCAN(pts, eps + 0.01*distance/20, 50)
         # pts = self.Filter_xyz(pts, None, [min(pts1[:,0]), max(pts1[:,0]), min(pts1[:,1]), max(pts1[:,1]), min(pts1[:,2]), max(pts1[:,2])], None)
         # self.point_of_target_show(pts)
-        pts = Cluster.find_largest_cluster_DBSCAN(pts, 2, 5, self.extract.x,self.extract.z)
+        pts = Cluster.find_largest_cluster_DBSCAN(pts, 2, 5, self.extract.x, self.extract.z)
         return pts
 
     def POD(self, pts, frame_count, real_points, Width=None, Height=None):
@@ -707,7 +732,7 @@ class Analysis:
         print("max_width:", Max_Width_Height[0], "max_height:", Max_Width_Height[1])
         if Width == None:
             Width = Max_Width_Height[0]
-        if Height != None:
+        if Height == None:
             if self.index == 3:
                 temp = pts[np.where(pts[:, 8] % 2 == 0)]
                 for i in np.unique(temp[:, 1].astype(int)):
@@ -728,7 +753,8 @@ class Analysis:
         print('idea_points:', ideal_points)
         print('real_points:', real_points)
         print('*********POD:', pod, "\n")
-        results = [['distance', '{:.2f}'.format(distance), 'ideal_points', '{:.2f}'.format(ideal_points), 'real_points', '{:.2f}'.format(real_points), 'POD', '{:.2%}'.format(real_points / ideal_points)]]
+        results = [['distance', '{:.2f}'.format(distance), 'ideal_points', '{:.2f}'.format(ideal_points), 'real_points',
+                    '{:.2f}'.format(real_points), 'POD', '{:.2%}'.format(real_points / ideal_points)]]
         return results
 
     def Analyze_ROI_MAXClearance(self, pts, fields):
@@ -763,7 +789,7 @@ class Analysis:
         if 'flags' in fields:
             # pts = pts[np.where((pts[:, 7] > 10) & (pts[:, 7] < 12))]
             temp = np.zeros(len(fields) + 2)
-        if self.extract.LiDAR_model == 'K': # I/G/K/K24
+        if self.extract.LiDAR_model == 'K':  # I/G/K/K24
             print("start analysis K FOV&Res")
             for i in range(len(pts[:, 0])):
                 channel = np.append((pts[i]), [int('{:08b}'.format(int(pts[(i, 0)]))[-2:], 2)], axis=0)
@@ -779,7 +805,7 @@ class Analysis:
                 p.join()
 
             result = [self.q.get() for j in jobs]
-        
+
         elif self.extract.LiDAR_model == 'E':
             print("start analysis E FOV&Res")
             self.Calculate_Angle_Resolution(pts, -1, self.q)
@@ -798,10 +824,10 @@ class Analysis:
         """
         roi_line = 56
         scanline_coef = 4
-        widest_line = temp[np.where(temp[:, 1] == 64)] #Robin E 64
+        widest_line = temp[np.where(temp[:, 1] == 64)]  # Robin E 64
         # widest_line = temp[np.where(temp[:, 1] == 0)] #Robin E
 
-        if I >= 0: # Falcon I/G/K/K24
+        if I >= 0:  # Falcon I/G/K/K24
             temp = temp[np.where(temp[:, -1] == I)]
             temp1 = temp[np.where((temp[:, 4] > -0.04) & (temp[:, 4] < 0.04))]
             top_scanline_id = temp1[np.where(temp1[:, 3] == max(temp1[:, 3]))][:, 1][0]
@@ -811,15 +837,15 @@ class Analysis:
             bottom_line = temp[np.where((temp[:, 1] == bottom_scanline_id) & (temp[:, -2] == bottom_channel_id))]
             top_line = temp[np.where((temp[:, 1] == top_scanline_id) & (temp[:, -2] == top_channel_id))]
             widest_line = bottom_line
-        
-        if I <= 0: #Robin W/E
+
+        if I <= 0:  # Robin W/E
             roi_line = 0
             scanline_coef = 1
             bottom_line = temp[np.where(temp[:, 1] == min(temp[:, 1]))]
             top_line = temp[np.where(temp[:, 1] == max(temp[:, 1]))]
             if I == -2:
-                widest_line = temp[np.where(temp[:, 1] == max(temp[:, 1]) - 1)] # Robin W
-            
+                widest_line = temp[np.where(temp[:, 1] == max(temp[:, 1]) - 1)]  # Robin W
+
         widest_line_right = widest_line[np.where(widest_line[:, 4] == max(widest_line[:, 4]))]
         widest_line_left = widest_line[np.where(widest_line[:, 4] == min(widest_line[:, 4]))]
         bottom_point = bottom_line[np.where((bottom_line[:, 4] > -0.05) & (bottom_line[:, 4] < 0.05))]
@@ -839,17 +865,22 @@ class Analysis:
         Rz = widest_line_right[(0, 5)]
         Bz = bottom_point[(0, 5)]
         Tz = top_point[(0, 5)]
-        Hangle = np.degrees(np.arccos((Ly * Ry + Lz * Rz) / np.sqrt((pow(Ly, 2) + pow(Lz, 2)) * (pow(Ry, 2) + pow(Rz, 2)))))
-        Vangle = np.degrees(np.arccos((Bx * Tx + Bz * Tz) / np.sqrt((pow(Bx, 2) + pow(Bz, 2)) * (pow(Tx, 2) + pow(Tz, 2)))))
+        Hangle = np.degrees(
+            np.arccos((Ly * Ry + Lz * Rz) / np.sqrt((pow(Ly, 2) + pow(Lz, 2)) * (pow(Ry, 2) + pow(Rz, 2)))))
+        Vangle = np.degrees(
+            np.arccos((Bx * Tx + Bz * Tz) / np.sqrt((pow(Bx, 2) + pow(Bz, 2)) * (pow(Tx, 2) + pow(Tz, 2)))))
         H_Resolution = Hangle / points_num
         V_Resolution = Vangle / line_num
-        print('Hangle:', Hangle, 'H_Resolution:', H_Resolution, 'Vangle:', Vangle, 'V_Resolution:', V_Resolution, 'ROI:', I)
-        q.put(['Hangle:', Hangle, 'H_Resolution:', H_Resolution, 'Vangle:', Vangle, 'V_Resolution:', V_Resolution, 'ROI:', I])
+        print('Hangle:', Hangle, 'H_Resolution:', H_Resolution, 'Vangle:', Vangle, 'V_Resolution:', V_Resolution,
+              'ROI:', I)
+        q.put(
+            ['Hangle:', Hangle, 'H_Resolution:', H_Resolution, 'Vangle:', Vangle, 'V_Resolution:', V_Resolution, 'ROI:',
+             I])
         # return Hangle, H_Resolution, Vangle, V_Resolution
 
     def Calculate_Diff_Facet_POD(self, pts_sel, frame_counts):
         points_f0 = self.Filter_xyz(pts_sel, [], [], [], 0)
-        points_f1 = self.Filter_xyz(pts_sel, [], [], [], 1) 
+        points_f1 = self.Filter_xyz(pts_sel, [], [], [], 1)
         # points_f2 = self.Filter_xyz(pts_sel, [], [], [], 2)
         # points_f3 = self.Filter_xyz(pts_sel, [], [], [], 3)
         POD_f0 = self.POD(points_f0, frame_counts, len(points_f0[:, 4]) / frame_counts)
@@ -860,13 +891,24 @@ class Analysis:
         res = [POD_f0, POD_f1]
         return res
 
-    def Calculate_Diff_Scanid_POD(self, pts_sel, frame_counts, width = None, height = None):
+    def Calculate_Diff_Scanid_POD(self, pts_sel, frame_counts, width=None, height=None):
         self.POD(pts_sel, frame_counts, len(pts_sel[:, 4]) / frame_counts, width, height)
         scanid_list = np.unique(pts_sel[:, 1]).tolist()
         res = []
         for i in range(len(scanid_list)):
             scanid_points = self.Filter_xyz(pts_sel, [], [], [], None, scanid_list[i])
             res.append(self.POD(scanid_points, frame_counts, len(scanid_points[:, 4]) / frame_counts, width, height))
+
+        return res
+
+    def Calculate_Diff_Scanid_Intensity(self, pts_sel):
+        scanid_list = np.unique(pts_sel[:, 1]).tolist()
+        res = []
+        for i in range(len(scanid_list)):
+            scanid_points = self.Filter_xyz(pts_sel, [], [], [], None, scanid_list[i])
+            mean_intensity = np.mean(scanid_points[:, 6])
+            print("Selected scanline {} mean intensity is: {}".format(scanid_list[i], mean_intensity))
+            res.append(mean_intensity)
 
         return res
 
@@ -884,7 +926,7 @@ class Analysis:
         max_height = max(pts_sel[:, self.extract.x]) - min(pts_sel[:, self.extract.x])
         results = [max_width, max_height]
         return results
-    
+
     def Get_Max_Min_xyz(self, pts_sel):
         x_max = pts_sel[np.where(pts_sel[:, self.extract.x] == max(pts_sel[:, self.extract.x]))][:, self.extract.x][0]
         x_min = pts_sel[np.where(pts_sel[:, self.extract.x] == min(pts_sel[:, self.extract.x]))][:, self.extract.x][0]
@@ -893,10 +935,10 @@ class Analysis:
         z_max = pts_sel[np.where(pts_sel[:, self.extract.z] == max(pts_sel[:, self.extract.z]))][:, self.extract.z][0]
         z_min = pts_sel[np.where(pts_sel[:, self.extract.z] == min(pts_sel[:, self.extract.z]))][:, self.extract.z][0]
         return [x_min, x_max, y_min, y_max, z_min, z_max]
-        
-    
+
+
 class Fitting_plane:
-    
+
     def __init__(self):
         pass
 
@@ -932,7 +974,7 @@ class Fitting_plane:
         # print('标准差：%.3f' % standard_deviation)
 
         return a, b, c, standard_deviation
-    
+
     def fit_plane_Ransac(self, xyzs, threshold=0.01, max_iterations=1000, ground=0):
         """
         使用RANSAC算法从三维点云中拟合最佳平面
@@ -968,9 +1010,11 @@ class Fitting_plane:
                 best_model = a, b, c
                 best_num_inliers = num_inliers
                 best_inliers_temp = inliers_temp
-        print('best_model:', best_model, 'best_num_inliers', best_num_inliers, 'best_std_dev', best_std_dev, 'sum_pts', xyzs.shape[0])
-        return best_model, best_std_dev, best_inliers_temp
-    
+                best_inlier_indices = inlier_indices
+        print('best_model:', best_model, 'best_num_inliers', best_num_inliers, 'best_std_dev', best_std_dev, 'sum_pts',
+              xyzs.shape[0])
+        return best_model, best_std_dev, best_inliers_temp, best_inlier_indices
+
     def calculate_plane_thickness(self, points, model):
         # 定义平面方程系数
         a, b, c = model
@@ -984,7 +1028,6 @@ class Fitting_plane:
 
         # 输出结果
         print(distances)
-
 
     def fit_plane(self, xyzs, ground):
         """
@@ -1008,7 +1051,7 @@ class Fitting_plane:
         D = -(A * P1[0] + B * P1[1] + C * P1[2])
         model = A, B, C, D
         return model
-    
+
     def pts_to_plane_distance(self, model, xyzs):
         distance = []
         A, B, C, D = model
@@ -1019,74 +1062,79 @@ class Fitting_plane:
             distance.append(numerator / denominator)
         distance = np.nan_to_num(distance, nan=0.0, posinf=0.0, neginf=0.0)
         return distance
-    
+
     def Extract_point_fitting_plane(self, pts_sel, FrameLimit, topic, ground):
         """
         Extract points to fitting plane
             Args:
         """
-        i = FrameLimit[0]
+        # i = FrameLimit[0]
         max_iterations = 1500
         n = pts_sel.shape[0]
         goal_inliers = n * 0.95
-        threshold= 0.09
+        threshold = 0.025
         best_std_dev = float('inf')
         # points data
-        xyzs = pts_sel[:,3:6]
+        xyzs = pts_sel[:, 3:6]
         print(topic)
         if topic != '/iv_points' and topic != 'iv_points':
-            # xyzs = pts_sel[:,0:3]
-            xyzs = pts_sel[:,3:6]
+            xyzs = pts_sel[:, 0:3]
+            # xyzs = pts_sel[:,3:6]
         print(len(xyzs))
         # RANSAC
         for i in range(2):
-            model, std_dev, inliers_temp = self.fit_plane_Ransac(xyzs, threshold, max_iterations, ground)
+            model, std_dev, inliers_temp, inlier_indices = self.fit_plane_Ransac(xyzs, threshold, max_iterations,
+                                                                                 ground)
             if std_dev < best_std_dev:
                 best_std_dev = std_dev
                 best_model = model
                 best_inliers_temp = inliers_temp
+                best_inlier_indices = inlier_indices
         self.calculate_plane_thickness(best_inliers_temp, best_model)
         a, b, c = best_model
-        Precision = ['a', a, 'b', b, 'c', c, 'sigma', best_std_dev]
+        Precision = ['a', a, 'b', b, 'c', c, 'sigma', best_std_dev, best_inlier_indices]
         print(Precision)
+        inliers_points = pts_sel[best_inlier_indices]
+        outliers_points = pts_sel[np.setdiff1d(np.arange(pts_sel.shape[0]), best_inlier_indices)]
         return Precision
-    
+
+
 class Cluster:
-        
+
     def __init__(self):
         pass
-    
+
     def find_largest_cluster_KMeans(points):
         # 使用KMeans进行粗略聚类
         kmeans = KMeans(n_clusters=150)  # 或者使用 DBSCAN(n_clusters=10)
         labels = kmeans.fit_predict(points[:, 3:6])
-        
+
         # 找出每个类别的点数
         unique_labels, counts = np.unique(labels, return_counts=True)
-        
+
         # 找到点数最多的类别
         largest_cluster_label = unique_labels[np.argmax(counts)]
-        
+
         # 输出点数最多的类别
         largest_cluster = points[:, 3:6][labels == largest_cluster_label]
         return largest_cluster
-    
+
     def find_largest_cluster_DBSCAN(points, e, min_samples, x_index, z_index):
         # 使用DBSCAN进行粗略聚类
         print('eps:', e, 'min_samples:', min_samples)
         dbscan = DBSCAN(eps=e, min_samples=min_samples)  # 调整eps和min_samples参数
-        labels = dbscan.fit_predict(points[:, x_index:z_index+1])
-        
+        labels = dbscan.fit_predict(points[:, x_index:z_index + 1])
+
         # 找出每个类别的点数
         unique_labels, counts = np.unique(labels, return_counts=True)
-        
+
         # 找到点数最多的类别
         largest_cluster_label = unique_labels[np.argmax(counts)]
-        
+
         # 输出点数最多的类别
         largest_cluster = points[labels == largest_cluster_label]
         return largest_cluster
-    
+
     def find_largest_cluster_HDBSCAN(points, e, min_samples):
         # 使用HDBSCAN进行聚类
         clusterer = hdbscan.HDBSCAN(min_cluster_size=10, min_samples=min_samples)
@@ -1102,9 +1150,9 @@ class Cluster:
             else:
                 color = plt.cm.jet(cluster / np.max(cluster_labels))  # 根据簇的标签选择颜色
             ax.scatter(points[cluster_labels == cluster][:, 3],
-                        points[cluster_labels == cluster][:, 4],
-                        points[cluster_labels == cluster][:, 5],
-                        c=color, marker='o')
+                       points[cluster_labels == cluster][:, 4],
+                       points[cluster_labels == cluster][:, 5],
+                       c=color, marker='o')
 
         plt.show()
 
@@ -1117,7 +1165,7 @@ if __name__ == '__main__':
         "/home/demo/Desktop/004TestData/0829ZeekrGlass/10m_noglass_2023-08-29-14-49-29.bag",
         "/home/demo/Desktop/004TestData/0829ZeekrGlass/15m_glass_2023-08-29-14-47-10.bag",
         "/home/demo/Desktop/004TestData/0829ZeekrGlass/15m_noglass_2023-08-29-14-44-30.bag"]
-    bounding00 = [0.5, 2.17, -0.45, 0.55, 9.9, 10.4] #10%ref glass
+    bounding00 = [0.5, 2.17, -0.45, 0.55, 9.9, 10.4]  # 10%ref glass
     bounding0 = [0.5, 2.17, -0.66, 0.38, 9.9, 10.4]
     bounding1 = [0.8, 2.71, -0.75, 0.28, 15, 15.4]
     bounding2 = [0.9, 2.75, -0.78, 0.25, 15, 15.4]
@@ -1131,13 +1179,13 @@ if __name__ == '__main__':
     bounding10 = [1.15, 2.75, -0.2, 1.35, 219.9, 220.15]
     bounding11 = [1.2, 2.8, 0.1, 1.65, 240, 240.35]
     bounding12 = [1.45, 2.95, -0.5, 1.25, 249.9, 250.3]
-    bounding13 = [-0.3, 0.5, -0.35, 0.5, 2.05, 2.25] #40%ref
+    bounding13 = [-0.3, 0.5, -0.35, 0.5, 2.05, 2.25]  # 40%ref
     bounding14 = [-0.1, 0.7, -0.65, 0.15, 20, 20.1]
     bounding15 = [-0.05, 0.85, -0.45, 0.45, 40.5, 40.7]
     bounding01 = [0, 0.95, -0.85, 0.05, 60.1, 60.3]
     bounding16 = [0, 1, -3.9, -3.0, 79.7, 80]
     bounding17 = [0.2, 1, -3.4, -2.55, 99.9, 100.1]
-    bounding18 = [-0.3, 0.5, -0.35, 0.5, 2.1, 2.3] #90%ref
+    bounding18 = [-0.3, 0.5, -0.35, 0.5, 2.1, 2.3]  # 90%ref
     bounding19 = [-0.1, 0.7, -0.25, 0.65, 19.9, 20.1]
     bounding20 = [-0.05, 0.85, -0.85, 0.05, 40.1, 40.2]
     bounding21 = [0, 0.95, -1.3, -0.4, 60.2, 60.3]
@@ -1152,8 +1200,8 @@ if __name__ == '__main__':
                 bounding18, bounding19, bounding20, bounding21, bounding22,
                 bounding23]
 
-    
     # for i in range(len(file_path)):
     #     Analysis().Calculate_data(file_path[i], [0, 100], [], [], [0, 0, 0, 1, 0], 0)
-    Analysis().Calculate_data('/home/demo/Desktop/004TestData/tusimple0905/sedandy01_2023-09-05-16-27-17.bag', [10,20], [150, 450, -6.5, 0, -10, -3.5], [], [0, 0, 0, 0, 1], 0)
+    Analysis().Calculate_data('/home/demo/Desktop/004TestData/tusimple0905/sedandy01_2023-09-05-16-27-17.bag', [10, 20],
+                              [150, 450, -6.5, 0, -10, -3.5], [], [0, 0, 0, 0, 1], 0)
     print('What have done is done')

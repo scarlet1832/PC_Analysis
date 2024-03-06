@@ -2,31 +2,32 @@ import rospy
 import sys
 import rosbag
 from std_msgs.msg import String
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud2, PointField
 # from sensor_msgs.msg import CustomPointCloud
 import sensor_msgs.point_cloud2 as pc2
 import numpy as np
 import Analysis.DataAnalysisExtract as DataAnalysisExtract
-import threading
+# import threading
 import math
 import pandas as pd
+import matplotlib.pyplot as plt
 
 option_dict = {
     'Write_CSV': 0,
     'Diff_Facet_POD': 0,
-    'POD': 1,
+    'POD': 0,
     'Precision': 0,
     'Diff_Facet_Angle': 0,
     'Noise_Number': 0,
-    'Mean_Intensity': 0,
+    'Mean_Intensity': 1,
     'FOV_Resolution': 0,
     'Distance': 0,
     'topic': 0,
-    'frame': 5,
+    'frame': 30,
     'Intnsity': [ ],
     'Width': None,
     'Height': None,
-    'Subscribe_Topic': 1
+    'Subscribe_Topic': 2
 }
 # Case = ['Write_CSV', 'Diff_Facet_POD', 'POD', 'Precision', 'Diff_Facet_Angle', 'Noise_Number', 'Mean_Intensity', 'FOV_Resolution', 'Distance', 'topic', 'frame', 'Intensity', 'Width', 'Height']
 # option_all = {'Case': Case, 'Value': [Write_CSV, Diff_Facet_POD, POD, Precision, Diff_Facet_Angle, Noise_Number, Mean_Intensity, FOV_Resolution, Distance, topic, frame, Intnsity, Width, Height]}
@@ -52,22 +53,22 @@ class Recv_Publish:
         self.analysis = DataAnalysisExtract.Analysis()
         self.point_cloud_array = []
         self.stop = False
-        self.frame_counts = 100
+        # self.frame_counts = 100
         self.Option = pd.DataFrame([option_dict])
-        self.bag = rosbag.Bag('test1.bag', 'w')
-        self.stop_event = threading.Event()
+        # self.bag = rosbag.Bag('test1.bag', 'w')
+        # self.stop_event = threading.Event()
         # self.Print_Normal = sys.stdout
         # self.Print_Error = sys.stderr
 
     def connect_data_analysis_get_bounding(self, point_cloud_nparray, fields):
         points, sorted_fields = self.analysis.extract.sort_fields(point_cloud_nparray, fields, self.topic)
         self.BoundingBox = self.analysis.Get_Max_Min_xyz(points)
-        self.BoundingBox[0] -= 0.06
-        self.BoundingBox[1] += 0.06
-        self.BoundingBox[2] -= 0.05
-        self.BoundingBox[3] += 0.05
-        self.BoundingBox[4] -= 0.15
-        self.BoundingBox[5] += 0.15
+        self.BoundingBox[0] -= 0.1
+        self.BoundingBox[1] += 0.1
+        self.BoundingBox[2] -= 0.1
+        self.BoundingBox[3] += 0.1
+        self.BoundingBox[4] -= 0.1
+        self.BoundingBox[5] += 0.1
         print("Get boundingBox:", self.BoundingBox)
         self.sign = 1
         self.point_cloud_array = []
@@ -90,14 +91,16 @@ class Recv_Publish:
             Diff_Facet_POD = self.analysis.Calculate_Diff_Facet_POD(points_all, self.Option['frame'].values[0])
 
         if self.Option['POD'].values[0] == 1:
-            POD = self.analysis.POD(points, self.Option['frame'].values[0], len(points[:, 4]) / self.Option['frame'].values[0], None, None)
-            # POD = self.analysis.Calculate_Diff_Scanid_POD(points, self.Option['frame'].values[0], 1.5, None)
+            # POD = self.analysis.POD(points, self.Option['frame'].values[0], len(points[:, 4]) / self.Option['frame'].values[0], 1.5, None)
+            POD = self.analysis.Calculate_Diff_Scanid_POD(points, self.Option['frame'].values[0], 1.5, None)
 
         if self.Option['Distance'].values[0] == 1:
             distance = self.analysis.get_points_distance(points)
 
         if self.Option['Precision'].values[0] == 1:
-            Precision = self.analysis.fitting_plane.Extract_point_fitting_plane(points, [0, 100], self.topic, ground=0)
+            # points = points[np.where(points[:, 0] == 2)]
+            Precision = self.analysis.fitting_plane.Extract_point_fitting_plane(points, [0, 100], self.topic, ground=1)
+            # self.process_outliers_points(points, Precision[8], sorted_fields)
 
         if self.Option['Diff_Facet_Angle'].values[0] == 1:
             angle = self.analysis.Calculate_facet01_fitting_plane(points, self.topic, ground=1)
@@ -113,13 +116,31 @@ class Recv_Publish:
             print("Noise_within Number:", len(Noise_within[:, 1])/self.Option['frame'].values[0])
 
         if self.Option['Mean_Intensity'].values[0] == 1:
-            MeanIntensity = np.mean(points[:, 6])
+            MeanIntensity = np.mean(points[:, 7])
             print("MeanIntensity:", MeanIntensity)
+            # self.analysis.Meanintensity_perframe(points, 8, 7, None)
+            self.analysis.Calculate_Diff_Scanid_Intensity(points)
 
         if self.Option['FOV_Resolution'].values[0] == 1:
             FOVROI = self.analysis.Analyze_FOVROI_Angular_Resolution(points_all, sorted_fields)
 
         self.update_topic()
+
+    def process_outliers_points(self, points, indices, sorted_fields):
+
+        inliers_points = points[indices]
+        # inliers_points = np.hstack((inliers_points[:, 3:8], inliers_points[:, 9].reshape(-1, 1)))
+        inliers_points = np.hstack((inliers_points, np.zeros((inliers_points.shape[0], 1))))
+
+        outliers_points = points[np.setdiff1d(np.arange(points.shape[0]), indices)]
+        # outliers_points = np.hstack((outliers_points[:, 3:8], outliers_points[:, 9].reshape(-1, 1)))
+        outliers_points = np.hstack((outliers_points, np.ones((outliers_points.shape[0], 1))))
+
+        pts = np.vstack((outliers_points, inliers_points))
+        self.Write_CSV(pts, sorted_fields+['outliers_points'])
+
+        # Use Rviz visualize point cloud to verify outliers points
+        # self.Publisher(pts, 'test_points')
 
     def process_data(self, pc_data):
         if self.topic == self.Topic[0]:
@@ -134,29 +155,29 @@ class Recv_Publish:
             # print("presign:", self.sign)
             self.connect_data_analysis_get_bounding(point_cloud_nparray, fields)
 
-        # elif self.topic == self.Topic[1]:  # W E
-        #     # self.bag.write(self.Topic[1], data)
-        #     fields = ["x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "ref_intensity", "radius", "intensity", "scan_id", "scan_idx", "reflectance"]
-        #     print("Frame Number:", self.i)
-        #     for point in pc_data:
-        #         x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, ref_intensity, radius, intensity, scan_id, scan_idx, reflectance = point
-        #         point_data = [x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, ref_intensity, radius, intensity, scan_id, scan_idx, reflectance]
-        #         self.point_cloud_array.append(point_data)
-        #     if self.i == self.Option['frame'].values[0]:
-        #         point_cloud_nparray = np.array(self.point_cloud_array)
-        #         self.connect_data_analysis_apply_bounding(point_cloud_nparray, fields)
-
-        elif self.topic == self.Topic[1]:  # CC
+        elif self.topic == self.Topic[1]:  # W E
             # self.bag.write(self.Topic[1], data)
-            fields = ["x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "galvo_direction", "radius", "intensity", "scan_id", "scan_idx", "reflectance"]
+            fields = ["x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "ref_intensity", "radius", "intensity", "scan_id", "scan_idx", "reflectance"]
             print("Frame Number:", self.i)
             for point in pc_data:
-                x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, galvo_direction, radius, intensity, scan_id, scan_idx, reflectance = point
-                point_data = [x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, galvo_direction, radius, intensity, scan_id, scan_idx, reflectance]
+                x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, ref_intensity, radius, intensity, scan_id, scan_idx, reflectance = point
+                point_data = [x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, ref_intensity, radius, intensity, scan_id, scan_idx, reflectance]
                 self.point_cloud_array.append(point_data)
             if self.i == self.Option['frame'].values[0]:
                 point_cloud_nparray = np.array(self.point_cloud_array)
                 self.connect_data_analysis_apply_bounding(point_cloud_nparray, fields)
+
+        # elif self.topic == self.Topic[1]:  # CC
+        #     # self.bag.write(self.Topic[1], data)
+        #     fields = ["x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "galvo_direction", "radius", "intensity", "scan_id", "scan_idx", "reflectance"]
+        #     print("Frame Number:", self.i)
+        #     for point in pc_data:
+        #         x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, galvo_direction, radius, intensity, scan_id, scan_idx, reflectance = point
+        #         point_data = [x, y, z, frame_id, channel, facet, echo, roi, poly_angle, galvo_angle, h_angle, v_angle, galvo_direction, radius, intensity, scan_id, scan_idx, reflectance]
+        #         self.point_cloud_array.append(point_data)
+        #     if self.i == self.Option['frame'].values[0]:
+        #         point_cloud_nparray = np.array(self.point_cloud_array)
+        #         self.connect_data_analysis_apply_bounding(point_cloud_nparray, fields)
 
         elif self.topic == self.Topic[2]:
             fields = ["x", "y", "z", "timestamp", "intensity", "flags", "elongation", "scan_id", "scan_idx", "is_2nd_return"]
@@ -173,23 +194,25 @@ class Recv_Publish:
         if self.topic == self.Topic[0]:
             pc_data = pc2.read_points(data, field_names=("x", "y", "z", "timestamp", "intensity"), skip_nans=True)
             # rospy.loginfo("Received PointCloud2: x=%f, y=%f, z=%f, timestamp=%f, intensity=%i, flags=%i, elongation=%i, scan_id=%i, scan_idx=%i, is_2nd_return=%i", x, y, z, timestamp, intensity, flags, elongation, scan_id, scan_idx, is_2nd_return)
-        # elif self.topic == self.Topic[1]: # W E
-        #     pc_data = pc2.read_points(data, field_names=("x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "ref_intensity", "radius", "intensity", "scan_id", "scan_idx", "reflectance"), skip_nans=True)
-        #     self.i += 1
 
-        elif self.topic == self.Topic[1]: # CC
-            pc_data = pc2.read_points(data, field_names=("x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "galvo_direction", "radius", "intensity", "scan_id", "scan_idx", "reflectance"), skip_nans=True)
+        elif self.topic == self.Topic[1]: # W E
+            pc_data = pc2.read_points(data, field_names=("x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "ref_intensity", "radius", "intensity", "scan_id", "scan_idx", "reflectance"), skip_nans=True)
             self.i += 1
+
+        # elif self.topic == self.Topic[1]: # CC
+        #     pc_data = pc2.read_points(data, field_names=("x", "y", "z", "frame_id", "channel", "facet", "echo", "roi", "poly_angle", "galvo_angle", "h_angle", "v_angle", "galvo_direction", "radius", "intensity", "scan_id", "scan_idx", "reflectance"), skip_nans=True)
+        #     self.i += 1
 
         elif self.topic == self.Topic[2]:
             pc_data = pc2.read_points(data, field_names=("x", "y", "z", "timestamp", "intensity", "flags", "elongation", "scan_id", "scan_idx", "is_2nd_return"), skip_nans=True)
             self.i += 1
 
-        threading.Thread(target=self.process_data, args=(pc_data,)).start()
+        # threading.Thread(target=self.process_data, args=(pc_data,)).start()
+        self.process_data(pc_data)
 
-    def write_bag(self, msg):
-        if self.bag.close():
-            self.bag.write(topic='/cali_points', msg=msg)
+    # def write_bag(self, msg):
+    #     if self.bag.close():
+    #         self.bag.write(topic='/cali_points', msg=msg)
 
 
 
@@ -217,7 +240,7 @@ class Recv_Publish:
 
     def update_topic(self):
         print("Update:last topic is %s, change to %s" %(self.Topic[self.last_sign], self.Topic[self.sign]))
-        self.stop_event.set()
+        # self.stop_event.set()
         # self.change_topic(self.Topic[0])
         if self.sign != self.last_sign:
             print("startChange")
@@ -229,8 +252,8 @@ class Recv_Publish:
                 self.change_topic(self.Topic[1])
         print("current sign:", self.sign)
             
-    def Publisher(self, data, pub_topic):
-        rospy.init_node("pointcloud_publisher")
+    def Publisher(self, points, pub_topic):
+        # rospy.init_node("pointcloud_publisher")
         pub = rospy.Publisher(pub_topic, PointCloud2, queue_size=10)
 
         # 创建PointCloud2消息
@@ -242,7 +265,22 @@ class Recv_Publish:
 
         # 发布PointCloud2消息
         rate = rospy.Rate(10)  # 发布频率
-        pub.publish(data)
+        fields = [PointField('x', 0, PointField.FLOAT32, 1),
+                  PointField('y', 4, PointField.FLOAT32, 1),
+                  PointField('z', 8, PointField.FLOAT32, 1),
+                  PointField('intensity', 12, PointField.FLOAT32, 1),
+                  PointField('reflectance', 16, PointField.FLOAT32, 1),
+                  PointField('echo', 20, PointField.FLOAT32, 1),
+                  PointField('outliers', 24, PointField.FLOAT32, 1)
+                  ]
+        pc_data = pc2.create_cloud(header, fields, points.tolist())
+        start_time = rospy.Time.now().to_sec()  # 获取开始时间
+        while (rospy.Time.now().to_sec() - start_time) < 30:  # 持续30秒
+            pub.publish(pc_data)
+            rate.sleep()  # 确保符合设定的发布频率
+
+        rospy.spin()
+        # pub.publish(pc_data)
         # while not rospy.is_shutdown():
         #     points = np.random.rand(num_points, 3).tolist()  # 使用随机数据作为点云数据
         #     pc_data = pc2.create_cloud_xyz32(header, points)
