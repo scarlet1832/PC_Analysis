@@ -176,6 +176,46 @@ class Extract:
                 e = None
                 del e
 
+    def Cluster_DBSCAN(self, eps=0.05):
+        # DBSCAN assumes that the number of columns is associated with the number of dimensions.
+        # self.cluster_ransac()
+        # tofit = self.rotate_pcd()
+        tofit = self.pcd[self.inlier_mask]
+        # Scale down the data if needed to handle large datasets
+        # Function to scale down data as needed
+
+        sampled_indices = np.random.choice(np.where(self.inlier_mask)[0], size=50000, replace=False)
+        sampled_tofit = tofit[sampled_indices]
+
+        # Set the inlier_mask to False for points that were not sampled
+        self.inlier_mask = np.full(len(self.pcd), False)
+        self.inlier_mask[sampled_indices] = True
+
+        pca = PCA(n_components=2)
+        reduced_tofit = pca.fit_transform(sampled_tofit)
+        db = DBSCAN(eps=eps, min_samples=3).fit(reduced_tofit)
+        core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+        core_samples_mask[db.core_sample_indices_] = True
+
+        from collections import Counter
+        counter = Counter(db.labels_)
+        most_points_cluster = max(counter, key=counter.get)
+        most_points_label = db.labels_[most_points_cluster]
+
+        # Set the labels to -1 for points that were not sampled
+        db_labels = np.full(len(self.pcd), -1)
+        db_labels[sampled_indices] = db.labels_
+        self.clusters[self.inlier_mask] = db_labels
+
+        # Number of clusters in labels, ignoring noise if present.
+        self.n_clusters_ = len(set(self.clusters)) - (1 if -1 in self.clusters else 0)
+        self.n_noise_ = list(self.clusters).count(-1)
+
+        new_mask = np.zeros(len(self.pcd))
+        new_mask[self.inlier_mask][db.labels_ == most_points_label] == 1
+        self.inlier_mask = new_mask
+
+
     def get_pcd_data(self, file_path):
         """
         Get point cloud data from pcd
@@ -906,9 +946,28 @@ class Analysis:
         res = []
         for i in range(len(scanid_list)):
             scanid_points = self.Filter_xyz(pts_sel, [], [], [], None, scanid_list[i])
-            mean_intensity = np.mean(scanid_points[:, 6])
-            print("Selected scanline {} mean intensity is: {}".format(scanid_list[i], mean_intensity))
-            res.append(mean_intensity)
+            weak_scanid_points = scanid_points[np.where(scanid_points[:, 9] < 2)]
+            strong_scanid_points = scanid_points[np.where(scanid_points[:, 9] > 1)]
+            weak_mean_intensity = np.mean(weak_scanid_points[:, 6])
+            strong_mean_intensity = np.mean(strong_scanid_points[:, 6])
+            # mean_intensity = np.mean(scanid_points[:, 6])
+            # mean_elongation = np.mean(scanid_points[:, 8])
+            print("Selected scanline {} weak_mean_distance is: {}, strong_mean_distance is: {}".format(scanid_list[i], weak_mean_intensity, strong_mean_intensity))
+            res.append([scanid_list[i], weak_mean_intensity, strong_mean_intensity])
+
+        return res
+
+    def Calculate_Diff_Scanid_Distance(self, pts_sel):
+        scanid_list = np.unique(pts_sel[:, 1]).tolist()
+        res = []
+        for i in range(len(scanid_list)):
+            scanid_points = self.Filter_xyz(pts_sel, [], [], [], None, scanid_list[i])
+            weak_scanid_points = scanid_points[np.where(scanid_points[:, 9] < 2)]
+            strong_scanid_points = scanid_points[np.where(scanid_points[:, 9] > 1)]
+            weak_mean_distance = np.mean(weak_scanid_points[:, 5])
+            strong_mean_distance = np.mean(strong_scanid_points[:, 5])
+            print("Selected scanline {} weak_mean_distance is: {}, strong_mean_distance is: {}".format(scanid_list[i], weak_mean_distance, strong_mean_distance))
+            res.append(weak_mean_distance)
 
         return res
 

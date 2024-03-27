@@ -1,3 +1,4 @@
+import datetime
 import rospy
 import sys
 import rosbag
@@ -23,7 +24,7 @@ option_dict = {
     'FOV_Resolution': 0,
     'Distance': 0,
     'topic': 0,
-    'frame': 30,
+    'frame': 3,
     'Intnsity': [ ],
     'Width': None,
     'Height': None,
@@ -68,7 +69,7 @@ class Recv_Publish:
         self.BoundingBox[2] -= 0.1
         self.BoundingBox[3] += 0.1
         self.BoundingBox[4] -= 0.1
-        self.BoundingBox[5] += 0.1
+        self.BoundingBox[5] += 0.2
         print("Get boundingBox:", self.BoundingBox)
         self.sign = 1
         self.point_cloud_array = []
@@ -85,7 +86,7 @@ class Recv_Publish:
         self.analysis.Update_index()
         points = self.analysis.Filter_xyz(points_all, [], self.BoundingBox, [])
         if self.Option['Write_CSV'].values[0] == 1:
-            self.Write_CSV(points, sorted_fields)
+            self.Write_CSV(points_all, sorted_fields)
 
         if self.Option['Diff_Facet_POD'].values[0] == 1:
             Diff_Facet_POD = self.analysis.Calculate_Diff_Facet_POD(points_all, self.Option['frame'].values[0])
@@ -95,7 +96,8 @@ class Recv_Publish:
             POD = self.analysis.Calculate_Diff_Scanid_POD(points, self.Option['frame'].values[0], 1.5, None)
 
         if self.Option['Distance'].values[0] == 1:
-            distance = self.analysis.get_points_distance(points)
+            # distance = self.analysis.get_points_distance(points)
+            distance = self.analysis.Calculate_Diff_Scanid_Distance(points)
 
         if self.Option['Precision'].values[0] == 1:
             # points = points[np.where(points[:, 0] == 2)]
@@ -116,10 +118,11 @@ class Recv_Publish:
             print("Noise_within Number:", len(Noise_within[:, 1])/self.Option['frame'].values[0])
 
         if self.Option['Mean_Intensity'].values[0] == 1:
-            MeanIntensity = np.mean(points[:, 7])
-            print("MeanIntensity:", MeanIntensity)
+            # MeanIntensity = np.mean(points[:, 6])
+            # print("MeanIntensity:", MeanIntensity)
             # self.analysis.Meanintensity_perframe(points, 8, 7, None)
-            self.analysis.Calculate_Diff_Scanid_Intensity(points)
+            res = self.analysis.Calculate_Diff_Scanid_Intensity(points)
+            self.Write_CSV(res, ['scanid_list', 'weak_mean_intensity', 'strong_mean_intensity'])
 
         if self.Option['FOV_Resolution'].values[0] == 1:
             FOVROI = self.analysis.Analyze_FOVROI_Angular_Resolution(points_all, sorted_fields)
@@ -293,7 +296,7 @@ class Recv_Publish:
         column_headers = fields
 
         # 指定保存的文件名和文件格式（这里是CSV）
-        file_name = "my_csv_file.csv"
+        file_name = "my_csv_file_{}.csv".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
         # 使用savetxt函数将NumPy数组保存为CSV文件，同时指定列标题
         np.savetxt(file_name, points, delimiter=",", header=",".join(column_headers), comments="", fmt="%f")
